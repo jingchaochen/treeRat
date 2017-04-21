@@ -12,6 +12,10 @@
 
 #define cNo_Undef 0x3fffffff
 
+#ifdef  __APPLE__
+   typedef  off_t  off64_t;
+#endif
+
 namespace treeRat {
 
 

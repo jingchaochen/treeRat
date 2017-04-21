@@ -29,7 +29,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define    VERIFIED   2
 #define    SEG_SIZE  10000
 #define    HASHSIZE  500000
-
+ 
 int HASHBLOCK=2000000;
 
 using namespace treeRat;
@@ -552,7 +552,11 @@ next:
  
 void checker :: readratOutput(char * rupfile) 
 {       
+#ifdef  __APPLE__
+        rat_fp  = fopen(rupfile, "r");
+#else
         rat_fp  = fopen64(rupfile, "r");
+#endif
         if (rat_fp == NULL) {
 		fprintf(stderr, "c Error: cannot open the drat file: %s\n", rupfile);
 		exit(-1);
@@ -570,8 +574,12 @@ void checker :: readratOutput(char * rupfile)
         while(1) {
 		char c = fgetc(rat_fp);
                 if (c == 'd'){
-        		curpos = ftello64(rat_fp)+1;
-                        int m=filePos.size();
+        	#ifdef  __APPLE__
+        		curpos = ftello(rat_fp)+1;
+                #else 
+               	        curpos = ftello64(rat_fp)+1;
+                #endif
+        	         int m=filePos.size();
                         if(m){ 
                             off64_t base = filebase[(m-1)/SEG_SIZE];
                             Delqueue.push(DelInfo(m,int(curpos-base)));
@@ -582,9 +590,14 @@ void checker :: readratOutput(char * rupfile)
                  }
 		 if(c == EOF) return;
                  if(c == '\n') continue;
-                 fseeko64(rat_fp, (off64_t)-1, SEEK_CUR);
-                 curpos = ftello64(rat_fp);
-               	 lits.clear();
+                 #ifdef  __APPLE__
+        	     fseeko(rat_fp, (off64_t)-1, SEEK_CUR);
+                     curpos = ftello(rat_fp);
+                #else 
+                     fseeko64(rat_fp, (off64_t)-1, SEEK_CUR);
+                     curpos = ftello64(rat_fp);
+               	#endif
+        	 lits.clear();
                  int newV=0; 
                  while(1){
                         int ilit;
@@ -636,7 +649,7 @@ next:            ;
 	}
 done:
         LitEnd[prelit]=filePos.size();
-        if (verbosity) printf(" fbase.size=%d curpos=%"PRIu64" fPos.sz=%d\n",filebase.size(),curpos,filePos.size());
+        if (verbosity) printf("c fbase.size=%d curpos=%"PRIu64" fPos.sz=%d\n",filebase.size(),curpos,filePos.size());
 }
 
 int checker :: forwardCheck()
@@ -663,11 +676,17 @@ inline bool checker :: isconflict(vec<Lit> & lits)
 void checker :: readfile(int i,vec <Lit>  & lits)
 {
      off64_t pos = filebase[i/SEG_SIZE]+filePos[i];
-     fseeko64(rat_fp, pos,SEEK_SET);
+     #ifdef  __APPLE__
+           fseeko(rat_fp, pos,SEEK_SET);
+     #else 
+           fseeko64(rat_fp, pos,SEEK_SET);
+     #endif
+        	
      lits.clear();
      while(1){
           int ilit;
-          fscanf(rat_fp, "%i", &ilit);
+          int ret=fscanf(rat_fp, "%i", &ilit);
+          if(ret == EOF) break;
           if(ilit==0) return;
           lits.push(makeLit(ilit));
      }
@@ -794,7 +813,7 @@ bool checker :: extractUnit(int & proofn, int & unitproof)
     }
     int propStart=trail.size();
     removeProofunit(cur_unit);
-    if (verbosity)  printf("\n unitproof=%d cur_unit.sz=%d",unitproof,cur_unit.size());
+    if (verbosity)  printf("c unitproof=%d cur_unit.sz=%d \n",unitproof,cur_unit.size());
     vec <Lit> lits;
     int start_Idx=0,end_idx=0;
     int remUnit=0;
@@ -1237,7 +1256,6 @@ nextc:
      }
      else {
             cancelUntil(ilev+1);
-  //          printf("c do not  restoreDetach\n");
      }
   
      if(learnts[end-1] != CRef_Undef) attachClause(learnts[end-1], end);
@@ -1271,7 +1289,7 @@ void checker :: clearAllwatch()
 
 void checker :: rebuildwatch(int CurNo)
 {
-    if (verbosity) printf(" rebuildwatch attClauses=%d CurNo=%d \n",attClauses,CurNo);
+    if (verbosity) printf("c rebuildwatch attClauses=%d CurNo=%d \n",attClauses,CurNo);
     clearAllwatch();
     for (int i =0; i < clauses.size(); i++){
            CRef cr = clauses[i];
@@ -1312,7 +1330,7 @@ void checker :: deletewatch(int CurNo)
          attachClause(cr,No+1);
     }
     tmpdetach.clear(true);
-    if (verbosity) printf(" deleted attClauses=%d learnt23.size=%d\n",attClauses,learnt23.size());
+    if (verbosity) printf("c deleted attClauses=%d learnt23.size=%d\n",attClauses,learnt23.size());
 } 
  
 void checker :: removeTrailUnit(Lit uLit,int CurNo)
@@ -1451,11 +1469,10 @@ bool checker :: simplifyUnit(vec <UnitIndex> & new_unit)
           }
           if(unitpos[v] == cNo_Undef){
                 unitpos[v]=r_unit[i].idx+1;
-                if(nVars()<500) verifyflag[unitpos[v]] |= USEDFLAG;//??????bug
-              //  verifyflag[unitpos[v]] |= USEDFLAG;
+                if(nVars()<500) verifyflag[unitpos[v]] |= USEDFLAG;
           }
     }
-    if (verbosity) printf(" new unit size=%d  r_size=%d trail.size=%d \n",new_unit.size(),r_unit.size(),trail.size());
+    if (verbosity) printf("c new unit size=%d  r_size=%d trail.size=%d \n",new_unit.size(),r_unit.size(),trail.size());
     return non_empty;
 }               
 
@@ -1531,7 +1548,7 @@ void checker :: reducebufferlearnt()
           if(ca[cr].detach()) attachClause(cr, n+1);
     }
     learnt23.shrink(learnt23.size()-newsize);
-    if (verbosity) printf(" detached bin, tetrnary learnt #=%d \n",learnt23.size());
+    if (verbosity) printf("c detached bin, tetrnary learnt #=%d \n",learnt23.size());
 }
 
 bool checker :: finddetachUnit()
@@ -1557,7 +1574,7 @@ bool checker :: finddetachUnit()
             }
             if(j==0) { ret=true; analyze_used(n+1);break;}
      }
-     if (verbosity) printf("<dsz=%d dp=%d ret=%d trail.size=%d qhead=%d end >\n",dsz,dp,ret,trail.size(),qhead);
+     if (verbosity) printf("c <dsz=%d dp=%d ret=%d trail.size=%d qhead=%d end >\n",dsz,dp,ret,trail.size(),qhead);
      detachlist.shrink(detachlist.size()-dsz);
      return ret;
 }
@@ -1568,7 +1585,7 @@ int checker :: backwardCheck()
     eqvForwardmode=-1;
     printf("c backward check\n");
     printf("c %d inferences \n",filePos.size());
-    if(verbosity) printf("c r_unit #=%d ",r_unit.size());
+    if(verbosity) printf("c r_unit #=%d \n",r_unit.size());
  
     int maxNo=filePos.size();
     filePos.min_memory(maxNo);
@@ -1684,7 +1701,7 @@ int checker :: backwardCheck()
        int  auxUnitmode=0;
        for(int i=end; i>=0; i--){
           if (verbosity) if(i%100000==0)  
-                printf(" i=%d proofn=%d auxPropSum=%d ccnt=%d at#=%d \n",i,proofn,auxPropSum,ccnt,attClauses);
+                printf("c i=%d proofn=%d auxPropSum=%d ccnt=%d at#=%d \n",i,proofn,auxPropSum,ccnt,attClauses);
            if(ccnt%40000 == 39999){
                   int lsz=learnt23.size();
                   if(lsz && (auxPropSum-pre_Sum >50000 || (!yes_learnt23 && lsz<5000))) reducebufferlearnt();
@@ -1706,7 +1723,7 @@ int checker :: backwardCheck()
                     if(cUnit.idx == i){
                           cur_unit.pop();
                           lits.push(cUnit.lit);
-           if (verbosity) printf("!! i=%d u=%d unpf=%d pf=%d att#=%d\n", i,toIntLit(lits[0]),unproofn,proofn,attClauses);
+           if (verbosity) printf("c !! i=%d u=%d unpf=%d pf=%d att#=%d\n", i,toIntLit(lits[0]),unproofn,proofn,attClauses);
                           removeTrailUnit(lits[0],i);
                           while(auxUnit.size()){
                                Lit lit=auxUnit.last();
@@ -1794,27 +1811,6 @@ repeat:
                 }
                 if(unproofn==0) {
                         if(!non_empty) filePos.shrink_(filePos.size()-1-i);
-                       /*
-                        if(winmode>1 && verbosity){
-                            printf(" ????fail %d proofn=%d size=%d end=%d \n",i,proofn,lits.size(),end);
-                            printf("\n%d new:",i);
-                            printclause((Lit *)lits, lits.size());
-                            readfile(i,lits);
-                            printf("\n%d org:",i);
-                            printclause((Lit *)lits, lits.size());
-                            ok=isconflict(lits);
-                            int pre_qhead=0;
-                            while (!ok && pre_qhead != qhead){
-                                 pre_qhead=qhead;
-                                 qhead=0;
-                                 if(watchmode) ok=!propagate();
-                                 else ok=!propagate2();
-                            }
-                            printf(" ok=%d \n",ok);
-                            checkClauseSAT(i-1,0);
-                            cancelUntil(decisionLevel()-1);
-                       }
-                      */
                 }
                 unproofn++;
                 if(lits.size()==1){
@@ -2045,12 +2041,7 @@ int checker :: RATCheck()
                        if(pivot== toInt(lits2[k])) continue;
                        lits3.push(lits2[k]);
                  }
-                 
-                 if(verbosity){
-                      printf("\n");
-                      for(int k=0; k<lits3.size(); k++) printf("%d ",toIntLit(lits3[k]));
-                 }
-
+                
                  if(!conflictCheck(i,lits3,begin,end)){
                      printf("c RAT check fail \n");
                      return 0;
@@ -2080,7 +2071,7 @@ int checker :: clauseUnfixed(Lit *lits, int sz)
      }
      return j;
 }
-
+/*
 void checker :: printclause(Lit *lits, int sz)
 {
      for (int k = 0; k < sz && k<100; k++) {
@@ -2091,7 +2082,7 @@ void checker :: printclause(Lit *lits, int sz)
    	    else printf("U ");
      }
 }
-
+*/
 //------------------------------------------------
 
 unsigned int sxhash (Lit * lits,int len) 
@@ -2112,11 +2103,16 @@ void checker :: readdelclause(int i,vec <Lit>  & lits)
      int offset=Delqueue[i].target.diskoffset;
      int m=Delqueue[i].timeNo-1;
      off64_t pos = filebase[m/SEG_SIZE]+offset;
-     fseeko64(rat_fp, pos,SEEK_SET);
+     #ifdef  __APPLE__
+           fseeko(rat_fp, pos,SEEK_SET);
+     #else 
+           fseeko64(rat_fp, pos,SEEK_SET);
+     #endif
      lits.clear();
      while(1){
           int ilit;
-          fscanf(rat_fp, "%i", &ilit);
+          int ret=fscanf(rat_fp, "%i", &ilit);
+          if(ret == EOF) break;
           if(ilit==0) break;
           lits.push(makeLit(ilit));
      }
@@ -2165,9 +2161,6 @@ void checker :: removeRepeatedCls(int end,int maxlevel)
            attachClause(cr,-i);
            core++;
     }
-
-  //  printf("c core clauses %d \n",core);
-    
     vec <int> clsno;
     for(int i=0; i<=end; i++){
           if(filePos[i] == -1) continue;
@@ -2181,10 +2174,13 @@ void checker :: removeRepeatedCls(int end,int maxlevel)
     int btn=0;
     for(int i=0; i<clsno.size()-1; i++){
           int n1=clsno[i];
-          Clause &  c1 = ca[learnts[n1]];
+          CRef cr1=learnts[n1];
+          if( cr1 == CRef_Undef ) continue;
+          Clause & c1 = ca[cr1];//bug 2017.4.11
           if(c1.size() <4) btn++;
           int n2=clsno[i+1];
           CRef cr2=learnts[n2];
+          if( cr2 == CRef_Undef ) continue;
           Clause &  c2 = ca[cr2];
           if( c1.size() != c2.size() ) continue;
           if( c1.detach() && !c2.detach()) c1.detach(0);
@@ -2391,7 +2387,7 @@ bool checker :: activateDelinfo(int & end, vec <UnitIndex> & c_unit)
          }
 
          if(i>=1000000 && (i%200000==0)) {
-                  if(verbosity)  printf(" i=%d \n",i);
+                  if(verbosity)  printf("c i=%d \n",i);
                   clearHashtbl(i);
                   if(i>=end-1000000) garbageCollect(); 
          }  
@@ -2436,7 +2432,6 @@ bool checker :: activateDelinfo(int & end, vec <UnitIndex> & c_unit)
          if(learnts[i] != CRef_Undef){
              if(k<Delqueue.size()){
                   int h=sxhash((Lit *)lits, sz);
-         
                   if(sz == 3){
                         if(match3(h, lits)){
                              removeClause(i+1);
@@ -2448,7 +2443,6 @@ bool checker :: activateDelinfo(int & end, vec <UnitIndex> & c_unit)
                   hashtbl[h].push(i+1);
                   if(verbosity && maxhsize<hashtbl[h].size()){
                      maxhsize=hashtbl[h].size();
-                     printf("\n<h[%d].sz=%d c.sz=%d: ",h,maxhsize,sz);
                   }
               }
          }
