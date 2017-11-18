@@ -1,4 +1,4 @@
-Copyright (c) November 2016, Jingchao Chen 
+Copyright (c) November 2017, Jingchao Chen 
 Email:chen-jc@dhu.edu.cn
 
 Permission is hereby granted, free of charge, to use this software for

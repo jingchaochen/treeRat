@@ -15,18 +15,36 @@ using namespace treeRat;
 
 BoolOption    forward ("forward mode", "f",    "foreward check", false);
 
+BoolOption    trace      ("trace mode", "trace",      "output resolution graph in TRACECHECK++ format", false);
+StringOption  trace_file ("trace mode", "trace-file", "trace output file", "NULL");
+FILE*  traceOutput;
+bool   tracecheck;   // output resolution graph 
+double initial_time;
 //=================================================================================================
 
 int main(int argc, char** argv)
 {
-  printf("c\nc This is treeRat, which supports drat formats\nc\n");
+    printf("c\nc This is treeRat, which supports drat formats\nc\n");
     try {
         setUsageHelp("c USAGE: %s <input-file> <RAT-output-file> <OPTIONS>\n\n");
         
         parseOptions(argc, argv, true);
+        tracecheck = trace;
+        if(tracecheck) {
+            if(!strcmp(trace_file,"NULL")) traceOutput = stdout;
+            else{
+#ifdef  __APPLE__
+               traceOutput =  fopen(trace_file, "wb");
+#else
+               traceOutput =  fopen64(trace_file, "wb");
+#endif
+            }
+            if (traceOutput == NULL) printf("c Could not open %s\n", (const char *)trace_file), exit(1);
+        }
+
         int ret=0;
         checker S;
-        double initial_time = cpuTime();
+        initial_time = cpuTime();
         
         if (argc < 3){
                printf("c Reading from standard input... Use '--help' for help.\n");
@@ -49,8 +67,8 @@ int main(int argc, char** argv)
                 return 1;
         }
         else{
-           if(forward) ret=S.forwardCheck();
-           else ret=S.backwardCheck();
+             if(forward) ret=S.forwardCheck();
+             else ret=S.backwardCheck();
         }
         double check_time = cpuTime();
         printf("c |  check time:  %12.2f s |\n", check_time - initial_time);

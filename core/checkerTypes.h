@@ -105,15 +105,19 @@ class Clause {
     struct {
       unsigned freesize  : 3;
       unsigned detach    : 1;
+      unsigned canDel    : 1;
+      unsigned reuse     : 1;
       unsigned disk      : 1;
-      unsigned size      : 26;
+      unsigned size      : 25;
     }  header;
     union { Lit lit; CRef rel;} data[0];
     friend class ClauseAllocator;
     template<class V>
     Clause(const V & ps, bool learnt) {
         header.freesize  = 0;
-        header.detach    = 0;
+        header.detach    = 1;
+        header.canDel    = 0;
+        header.reuse     = 0;
         header.disk      = 0;
         header.size      = ps.size();
         for (int i = 0; i < ps.size(); i++) data[i].lit = ps[i];
@@ -125,6 +129,10 @@ public:
     void         freesize    (uint32_t m)    { header.freesize = m; }
     uint32_t     detach      ()      const   { return header.detach;}
     void         detach      (uint32_t df)   { header.detach = df;}
+    uint32_t     canDel      ()      const   { return header.canDel;}
+    void         canDel      (uint32_t cd)   { header.canDel = cd;}
+    uint32_t     reuse       ()      const   { return header.reuse;}
+    void         reuse       (uint32_t rf)   { header.reuse = rf;}
     uint32_t     disk        ()      const   { return header.disk;}
     void         disk        (uint32_t df)   { header.disk = df;}
     Lit&         operator [] (int i)         { return data[i].lit; }
@@ -173,6 +181,8 @@ class ClauseAllocator : public RegionAllocator<uint32_t>
         cr = to.alloc(c);
         to[cr].freesize(c.freesize());
         to[cr].detach(c.detach());
+        to[cr].canDel(c.canDel());
+        to[cr].reuse  (c.reuse());
         to[cr].disk(c.disk());
     }
 };

@@ -6,7 +6,11 @@ treeRat can be built with g++ command:
 
 For running
 cd bin 
-./treeRat FORMULA PROOF
+./treeRat <FORMULA> <PROOF>
 
-A DIMACS CNF formula and DRAT/DRUP proof are mandatory arguments.
+For outputting TraceCheck+ dependency graphs
+./treeRat <FORMULA> <PROOF> -trace -trace-file=<FILE NAME>
+
+A DIMACS CNF <FORMULA> and DRAT/DRUP <PROOF> are mandatory arguments.
+
 

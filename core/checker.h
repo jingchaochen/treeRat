@@ -10,14 +10,13 @@
 #define _FILE_OFFSET_BITS 64
 #define _LARGE_FILES
 
-#define cNo_Undef 0x3fffffff
+#define cNo_Undef 0x7fffffff
 
 #ifdef  __APPLE__
    typedef  off_t  off64_t;
 #endif
 
 namespace treeRat {
-
 
    struct DelInfo {
         DelInfo(){}
@@ -64,8 +63,7 @@ public:
         Lit  lit;
         UnitIndex(int i, Lit l) {idx=i, lit=l;}
     };
-    vec <UnitIndex> r_unit;
-    vec <UnitIndex> cur_unit;
+    vec <UnitIndex> cur_unit, save_unit;
     int *occLit;
    
     vec <DelInfo> Delqueue;
@@ -73,7 +71,7 @@ public:
     void  readdelclause(int i,vec <Lit>  & lits);
    
     void DelRedundancyLit(vec <Lit> & lits,int No);
-    bool activateDelinfo(int & end, vec <UnitIndex> & c_unit);
+    void activateDelinfo(int & end, vec <UnitIndex> & c_unit);
     int  match(int h, Lit * lits, int len,int curNo);
     int  match3(int h, Lit * lits);
     vec<int> * hashtbl;
@@ -81,25 +79,31 @@ public:
     void restoreDelClause(int CurNo);
     void DetachDelClause();
     void DetachWatch(int begin, int end);
+    void DetachWatch2(int begin, int end);
     void detachWatch( vec<Watcher>& ws, int begin, int end);
     void detachWatch( vec<WatcherL>& ws, int begin, int end);
+    void detachWatcheck( vec<WatcherL>& ws, int begin, int end);
+    void DetachWatcheck(int begin, int end);
+    void detachWatch23( vec<Watcher>& ws,  int end);
+    void detachWatch23( vec<WatcherL>& ws, int end);
     void deletewatch(int CurNo);
+    void clearlearnt23(int maxLimit, bool attachflag);
+    void clearlearnt23();
+    void restorelearnt23(int MaxNo);
 
     FILE *rat_fp;
     void  readratOutput(char * rupfile);
     int   forwardCheck();
-    void  simplifylearnt(int CurNo);
     void  reducebufferlearnt();
-    bool  finddetachUnit();
+    bool  finddetachUnit(vec <int> & detachNo);
 
     void  readfile(int i,vec <Lit>  & lits);
     bool  isconflict(vec<Lit> & lits);
   
     int   backwardCheck();
-    bool  simplifyUnit(vec <UnitIndex> & new_unit);
-    bool  getcurUnit(vec <UnitIndex> & c_unit,int mode);
-
-    void  printwatchsize();
+    void  simplifyUnit();
+    void  setAuxUnit(Lit lit,int t);
+                                 
     int   maxCoreNo;
     void  removeTrailUnit(Lit uLit,int MaxNo);
     void  cancelloadtrueCls(int lev,int MaxNo);
@@ -107,22 +111,27 @@ public:
     void  rebuildwatch(int CurNo);
     bool  restoreAuxUnit();
 
-    bool extractUnit(int & proofn, int & unitproof);
+    void extractUnit(int & unitproof);
     void removeProofunit( vec <UnitIndex> & unit);
     int  decisionLevel () {return trail_lim.size();}
     int  attClauses, origVars,cutLen;
     void swapEqTofront(Clause & c, int eqVal);
-    void moveEqTofront(int preIdx, int curIdx, int ppIdx,int & eqvLen);
-    void eqvForwardcheck(Lit lit, int CurNo);
+    void moveEqTofront(int preIdx, int curIdx, int ppIdx,int & eqvLen, int c_start);
+    void moveBlockUsedTofront(int begin, int end);
+    void reAttachlearnt(int end);
+    void eqvForwardshift (int ulit, int begin, int CurNo);
+    void blockbackward(int curNo, int begin);
+    void restoreTmpdetach( );
+
+    void moveBlockEqTofront(int begin,int end);
+    void Localbackwardshift(int begin, int end);
     int  eqvForwardmode, winmode;
-
-    void loadfalselitclause();
-  
+   
     lbool   value      (Lit p) const;       // The current value of a literal.
-    int     nClauses   ()      const { return clauses.size(); }       // The current number of original clauses.
-    int     nVars      ()      const { return assigns.size(); }     // The current number of variables.
+    int     nClauses   ()      const { return clauses.size(); }       // number of original clauses.
+    int     nVars      ()      const { return assigns.size(); }     // number of variables.
 
-    double  garbage_frac;  // The fraction of wasted memory allowed before a garbage collection is triggered.
+    double  garbage_frac;  // The fraction of wasted memory allowed 
     void garbageCollect();
     void checkGarbage(){
           if (ca.wasted() > ca.size() * garbage_frac)  garbageCollect(); 
@@ -143,7 +152,7 @@ public:
     vec<lbool>          assigns;          // The current assignments.
     vec<Lit>            trail;            // Assignment stack; 
     vec<int>            trail_lim;        // Separator indices for different decision levels in 'trail'.
-    int                 qhead,ori_fixed;            // Head of queue (as index into the trail 
+    int                 qhead;            // Head of queue (as index into the trail) 
 
     ClauseAllocator     ca;
     vec<Lit>            add_tmp;
@@ -153,10 +162,17 @@ public:
     bool     propagateMax      (int maxCNo);     // Perform unit propagation. Returns conflict clause.
     bool     propagate         ();
     bool     propagate2        ();
+    bool     propagate3        ();
+
     bool     double_propagate (int maxCNo);
     void     cancelUntil      (int level);      // Backtrack until a certain level.
+    void     analyze_used_notrace(int confl);
+    void     analyze_used_trace(int confl);
+    void     analyze_used_tmp_notrace(int confl);
+    void     analyze_used_tmp_trace(int confl);
+    bool     shiftmode;
     void     analyze_used(int confl);
-    
+
     void     attachClause (CRef cr, int clsNo);    // Attach a clause to watcher lists.
     void     attachClause2(CRef cr, int clsNo);
     void     detachClause0(Clause & c, int clsNo);
@@ -164,27 +180,28 @@ public:
     int      remNum;
     void     removeClause     (int clsNo);        // Detach and free a clause.
     void     rebuildwatch();
-
-    void     saveDetach       (int level, int minNo);
-    void     restoreDetach    ();
-
-    void     loadbegin(int m);
-    int      loadblock(int begin, int end, int earlyflag);
+    void     prePropagate(int CurNo);
     vec<int> *trueClause;
-    vec<int> detachClsNo;
-    int      minClauseNo;
+  
+    void     saveDetach(int level,int minNo);
+    void     saveDetach       (int level, int minNo, int & minClauseNo,vec<int>  & detachClsNo);
+    void     restoreDetach    ();
+    void     restoreDetach    (int & minClauseNo, vec<int>  & detachClsNo);
+    vec<int> detachClsNo1,detachClsNo2;
+    int      minClauseNo1,minClauseNo2;
 
-    vec<int> LitBegin;
-    vec<int> LitEnd;
+    vec<int> lit_begin_end;
     vec<char> seen;
     vec<int> reason;
-    vec<int> unitpos;
+    vec<int> varLevel;
     
-    int      *varLevel;
+    int      maxdisFirstvar;
+    int      shiftproof;
+
     void     clearWatch( vec<Watcher> &  ws);
     void     clearAllwatch();
     void     clearWatch( vec<WatcherL> & wsL);
-    void     RemoveTrueClause(int extractMode);
+    void     setvarLevel(vec <UnitIndex> & c_unit);
     void     removeRepeatedCls(int end,int maxlevel);
     void     detachWatch( vec<Watcher>& ws);
     void     detachWatch( vec<WatcherL>& ws);
@@ -192,7 +209,7 @@ public:
     void     offtrueClause(vec <Lit> & lits,int No);
     void     offtrueClause(CRef cr,int No,int maxlevel);
    
-    void   relocAll (ClauseAllocator& to);
+    void     relocAll (ClauseAllocator& to);
 
 //rat check
     bool  conflictCheck(int No, vec<Lit> & lits,int & begin,int end);
@@ -203,13 +220,40 @@ public:
     int   removeRATindex (vec<Lit> & lits, int clsNo);
     void  buildRATindex ();
     int   RATCheck();
+    bool  refind(int & cls_i, int lrn_i);
+//tracecheck
+    vec<int> antecedents;
+    vec<int> tmp_antecedent;
+    vec<int> tmp_unitID;
+    int      shift_i;
+    void     use_pre_antecedent();
 
-    void  printwatch();
-    void  printclause(Lit *lits, int sz);
+    vec<int> unitClauseID;
+    vec<Lit> unitzeroID;
+    vec<int> unitID;
   
-    int   clauseUnfixed(Lit *lits, int sz);
-    void  checkClauseSAT(vec<CRef> & cs,int n, int begin);
-    void  checkClauseSAT(int curNo,int begin);
+   void printracHead(int clsNo, vec <Lit> & lits);
+    void printrace(int clsNo);
+    void printrace2(int clsNo);
+    void printRatBody(int clsNo);
+    void printraceEnd();
+    void TraceOrigClause();
+
+    void printEqRat1(int RatNo, vec <int> & lits);
+    void printEqRat2(int clsNo, int RatNo, vec <int> & lits);
+    int  origIDSize;
+    int  getClauseID(int clsNo){
+         return (clsNo<=0) ? -clsNo+1 : clsNo+origIDSize;
+    }
+    void unitpropagate();
+    void traceUnit(int clsNo,int lit);
+    void printEmptyclause1(int clsID, int cv);
+    void printEmptyclause2();
+    bool non_empty;
+    int  maxClauseID, auxClauseID;
+//
+    bool  checkClauseSAT(int & cls_i);
+    bool  checklearntSAT(int lrn_i);
 };
 //=================================================================================================
 
