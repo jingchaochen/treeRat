@@ -1672,7 +1672,8 @@ void checker :: Localbackwardshift(int begin, int end)
 //    printf("\n back B=%d E=%d ",begin, end);
 //    fflush(stdout);
 
-    if(end<begin+15000 || clauses.size()>3000000 || nofind){
+    int csz=clauses.size();  
+    if(end<begin+15000 || csz>3000000 || nofind || (10*bintrn>9*csz && nVars()>150000) ){
         prePropagate((begin+end)/2); // no win shift
         return;
     }
