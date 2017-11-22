@@ -1785,7 +1785,7 @@ det:
 
     prePropagate((begin+end)/2);
  
- //   printf(" %d verified inferences, %d fails begin=%d ",localproof,fail,begin);
+ //   printf(" %d verified inferences, %d fails ",localproof,fail);
 
     if(fail>2000 && fail>3*localproof) nofind=true;
     shiftproof += localproof;
@@ -2211,6 +2211,7 @@ int checker :: backwardCheck()
     filePos.min_memory(maxNo);
     maxCoreNo=origIDSize;
     verifyflag = (unsigned char * ) calloc (maxCoreNo+maxNo+4, sizeof(unsigned char));
+    varusemark = (char * ) calloc (nVars()+1, sizeof(char));
 
     int csz=clauses.size();  
     if(csz<10000 || (nVars()!=origVars && csz<500000) || (10*bintrn>9*csz && nVars()>450000))
@@ -2235,7 +2236,7 @@ int checker :: backwardCheck()
     printf("c %d out of %d units are verified in initial step\n",unitproof,cur_unit.size());
     if(nVars()<300000) occLit = (int * ) calloc (2*nVars()+1, sizeof(int));
 //    
-    if(maxdisFirstvar<5000 || lit_begin_end.size()<=30 || nVars()==origVars){
+    if(maxdisFirstvar<5000 || lit_begin_end.size()<=180 || nVars()<=origVars+50){
          lit_begin_end.clear();
          eqvForwardmode=0;
     }
@@ -2247,8 +2248,12 @@ int checker :: backwardCheck()
     int  end = filePos.size()-1;
 
     save_unit.clear();
-    for(int i=0; i<cur_unit.size(); i++) save_unit.push(cur_unit[i]);
-       
+    int usz=cur_unit.size();
+    for(int i=0; i<usz; i++){
+          save_unit.push(cur_unit[i]);
+          if(i>=usz-3) varusemark[var(cur_unit[i].lit)]=1;
+    }
+
     activateDelinfo(end,cur_unit);
      
     minClauseNo1=minClauseNo2=-1;
@@ -2388,6 +2393,11 @@ int checker :: backwardCheck()
            }
          
             if(lits.size()==1){
+                if(varusemark[var(lits[0])]==0){
+                    shiftmode=false;
+                    backshiftbegin=-1;
+                    continue;
+                }
                 verifyflag[i+1] |= USEDFLAG;
                 shiftmode=true;
            }
@@ -2602,7 +2612,10 @@ int checker :: RATCheck()
     winmode=3;
 //
     cur_unit.clear();
-    for(int i=0; i<save_unit.size(); i++) cur_unit.push(save_unit[i]);
+    for(int i=0; i<save_unit.size(); i++){
+            cur_unit.push(save_unit[i]);
+            unitClauseID[var(save_unit[i].lit)]=save_unit[i].idx+origIDSize+1;
+    }
     activateDelinfo(end, cur_unit);
      
     CRef cr;
@@ -3350,7 +3363,10 @@ simp:
           for (int c = trail.size()-1; c >=0; c--){
                Var  pv  = var(trail[c]);
                int No=reason [pv];
-               if (No == cNo_Undef) continue;
+               if (No == cNo_Undef) {
+                      if(unitClauseID[pv]) varusemark[pv]=1;
+                      continue;
+               }
                verifyflag[No] |= USEDFLAG;
           }
            return;
@@ -3371,7 +3387,10 @@ simp:
          for (int i =0; i < c.size(); i++){
                Var pv= var(c[i]);
                if (seen[pv]) continue;
-               if (reason [pv] == cNo_Undef) continue;
+               if (reason [pv] == cNo_Undef){
+                   if(unitClauseID[pv]) varusemark[pv]=1;
+                   continue;
+               }
                scan.push(pv);
                seen[pv]=97;
          }
@@ -3409,7 +3428,10 @@ void checker:: analyze_used_trace(int confl)
               seen[pv]=0;
               confl=reason [pv];
               if (confl == cNo_Undef){
-                   if(unitClauseID[pv]) antecedents.push(unitClauseID[pv]);
+                   if(unitClauseID[pv]){
+                        varusemark[pv]=1;
+                        antecedents.push(unitClauseID[pv]);
+                   }
                    continue;
               }
               antecedents.push(getClauseID(confl));
@@ -3423,7 +3445,10 @@ void checker:: analyze_used_trace(int confl)
           seen[pv]=0;
           confl=reason [pv];
           if (confl == cNo_Undef){
-                 if(unitClauseID[pv]) antecedents.push(unitClauseID[pv]);
+                 if(unitClauseID[pv]){
+                        varusemark[pv]=1;
+                        antecedents.push(unitClauseID[pv]);
+                 }
           }
           else  {
               verifyflag[confl] |= USEDFLAG;
@@ -3454,7 +3479,10 @@ void checker:: analyze_used_tmp_trace(int confl)
               seen[pv]=0;
               confl=reason [pv];
               if (confl == cNo_Undef){
-                   if(unitClauseID[pv]) tmp_unitID.push(unitClauseID[pv]);
+                   if(unitClauseID[pv]){
+                      varusemark[pv]=1;
+                      tmp_unitID.push(unitClauseID[pv]);
+                   }
                    continue;
               }
               tmp_antecedent.push(confl);
@@ -3486,8 +3514,10 @@ void checker:: analyze_used_tmp_notrace(int confl)
               if (seen[pv]==0) continue;
               seen[pv]=0;
               confl=reason [pv];
-              if (confl == cNo_Undef) continue;
-          //    if(confl>0) tmp_antecedent.push(confl);
+              if (confl == cNo_Undef){
+                    if(unitClauseID[pv]) varusemark[pv]=1;
+                    continue;
+              }
               tmp_antecedent.push(confl);
               i--; pre_v=pv;
               break;

@@ -192,6 +192,7 @@ public:
 
     vec<int> lit_begin_end;
     vec<char> seen;
+    char *varusemark;
     vec<int> reason;
     vec<int> varLevel;
     
