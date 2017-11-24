@@ -2214,7 +2214,7 @@ int checker :: backwardCheck()
     varusemark = (char * ) calloc (nVars()+1, sizeof(char));
 
     int csz=clauses.size();  
-    if(csz<10000 || (nVars()!=origVars && csz<500000) || (10*bintrn>9*csz && nVars()>450000))
+    if(csz<10000 || (nVars()!=origVars && csz<500000) || (10*bintrn>9*csz && nVars()>450000 && csz<2500000))
           for(int i=0; i <= maxCoreNo; i++) verifyflag[i]=USEDFLAG;
   
     verifyflag += maxCoreNo;
@@ -2246,15 +2246,14 @@ int checker :: backwardCheck()
     learnt23.clear();
      
     int  end = filePos.size()-1;
-
+    activateDelinfo(end,cur_unit);
+ 
     save_unit.clear();
     int usz=cur_unit.size();
     for(int i=0; i<usz; i++){
           save_unit.push(cur_unit[i]);
           if(i>=usz-3) varusemark[var(cur_unit[i].lit)]=1;
     }
-
-    activateDelinfo(end,cur_unit);
      
     minClauseNo1=minClauseNo2=-1;
     int clause_i=clauses.size();
