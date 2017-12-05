@@ -722,8 +722,7 @@ done:
              lit_begin_end.push(curIdx);
        }
        printf("c %d inferences\n",filePos.size());
-       fflush(stdout);
-       if (verbosity) printf("c fbase.size=%d curpos=%"PRIu64" fPos.sz=%d\n",filebase.size(),curpos,filePos.size());
+       if (verbosity) printf("c fbase.size=%d curpos=%"PRIu64" \n",filebase.size(),curpos);
 }
 
 int checker :: forwardCheck()
@@ -867,11 +866,12 @@ void checker :: removeProofunit( vec <UnitIndex> & punit)
 void checker :: extractUnit(int & unitproof)
 {
     newDecisionLevel();
-    for(int i=cur_unit.size()-1; i>=0; i--){
+  //  for(int i=cur_unit.size()-1; i>=0; i--){
+    for(int i=0; i<cur_unit.size(); i++){
            Lit lit=cur_unit[i].lit;
            int clsNo=cur_unit[i].idx+1;
            int cv=var(lit);
-           if (value(lit) == l_True ){//new idea
+           if (value(lit) == l_True ){
                  if(verifyflag[clsNo]== VERIFIED) continue;
                  int confl=reason [cv];
                  if(confl != cNo_Undef){
@@ -904,7 +904,6 @@ void checker :: extractUnit(int & unitproof)
     }
     cancelUntil(0);
     removeProofunit(cur_unit);
-//    if (verbosity)  printf("c unitproof=%d \n",unitproof);
 }
   
 void checker :: clearWatch( vec<Watcher>& ws)
@@ -3165,7 +3164,7 @@ nexstep:
           Delqueue[i].timeNo = Delqueue[i].timeNo-1;
           Delqueue[j++]=Delqueue[i];
     }
-    if(c_unit.size()<100 && clauses.size()<2000000 || origVars != nVars() || nVars()>250000) watchmode=0;
+    if(c_unit.size()<100 && clauses.size()<2000000 || origVars != nVars() || nVars()>350000) watchmode=0;
     else  watchmode=1;
     rebuildwatch(end);
 
