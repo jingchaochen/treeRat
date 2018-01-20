@@ -76,7 +76,7 @@ public:
     int  match3(int h, Lit * lits);
     vec<int> * hashtbl;
     void clearHashtbl(int cur_delno);
-    void restoreDelClause(int CurNo);
+    void restoreDelClause(int CurNo, int low=0, int candel_flag=0);
     void DetachDelClause();
     void DetachWatch(int begin, int end);
     void DetachWatch2(int begin, int end);
@@ -115,16 +115,17 @@ public:
     void removeProofunit( vec <UnitIndex> & unit);
     int  decisionLevel () {return trail_lim.size();}
     int  attClauses, origVars,cutLen;
-    void swapEqTofront(Clause & c, int eqVal);
-    void moveEqTofront(int preIdx, int curIdx, int ppIdx,int & eqvLen, int c_start);
-    void moveBlockUsedTofront(int begin, int end);
     void reAttachlearnt(int end);
     void eqvForwardshift (int ulit, int begin, int CurNo);
     void blockbackward(int curNo, int begin);
     void restoreTmpdetach( );
+    void swapEqTofront(Lit * lits, int sz, int eqVal);
+    int  moveEqTofront(vec <Lit> & preLit,vec <Lit> & curLit,vec <Lit> & nxtLit);
 
-    void moveBlockEqTofront(int begin,int end);
     void Localbackwardshift(int begin, int end);
+    void detachpartClause(int m,int localcut);
+    void DelInference(int & Delidx,int low);
+    int  finddelstart(int begin, int end,int timeNo);
     int  eqvForwardmode, winmode;
    
     lbool   value      (Lit p) const;       // The current value of a literal.

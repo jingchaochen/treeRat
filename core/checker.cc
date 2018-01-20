@@ -1,6 +1,6 @@
 /************************************************************************************
-Copyright (c) 2017, Jingchao Chen (chen-jc@dhu.edu.cn)
-November 18, 2017
+Copyright (c) 2018, Jingchao Chen (chen-jc@dhu.edu.cn)
+Jan. 20, 2018
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -557,11 +557,8 @@ bool checker::propagate3()
 
 void checker::relocAll(ClauseAllocator& to)
 {
-    // All learnt:
     for (int i = 0; i < learnts.size(); i++) 
                if( learnts[i] != CRef_Undef ) ca.reloc(learnts[i], to);
-  // All original:
-
     for (int i = 0; i < clauses.size(); i++)
                if( clauses[i] != CRef_Undef ) ca.reloc(clauses[i], to);
 }
@@ -866,7 +863,6 @@ void checker :: removeProofunit( vec <UnitIndex> & punit)
 void checker :: extractUnit(int & unitproof)
 {
     newDecisionLevel();
-  //  for(int i=cur_unit.size()-1; i>=0; i--){
     for(int i=0; i<cur_unit.size(); i++){
            Lit lit=cur_unit[i].lit;
            int clsNo=cur_unit[i].idx+1;
@@ -950,54 +946,6 @@ void checker :: setvarLevel(vec <UnitIndex> & c_unit)
     for (int i = trail.size()-1; i>=0; i--) varLevel[var(trail[i])]=0;
 }       
 
-inline void checker :: swapEqTofront(Clause & c, int eqVal)
-{
-      int j=1;
-      j=1;
-      for(int n=1; n<c.size(); n++){
-           if(seen[toInt(c[n])]!=eqVal) continue;
-           SwapLit(c[j],c[n]);
-           j++;
-      }
-}
-
-inline void checker :: moveEqTofront(int preIdx, int curIdx, int ppIdx,int & PreEqLen, int c_start)
-{      CRef cr1 = learnts[preIdx];
-       Clause &  c1 = ca[cr1];
-       CRef cr2 = learnts[curIdx];
-       Clause &  c2 = ca[cr2];
-       for(int n=c1.size()-1; n>=c_start; n--) seen[toInt(c1[n])]=1;
-       int curLen=1;
-       for(int n=c2.size()-1; n>=c_start; n--) {
-                if(seen[toInt(c2[n])]==0) continue;
-                curLen++;
-                seen[toInt(c2[n])]=2;
-       }
-       if(curLen > PreEqLen){
-                swapEqTofront(c1,2);
-                swapEqTofront(c2,2);
-                for(int n=c_start; n<curLen; n++) c2[n]=c1[n];
-        }
-        else{
-                if(ppIdx>0 && PreEqLen>0){
-                       CRef cr3 = learnts[ppIdx];
-                       Clause &  c3 = ca[cr3];
-                       for(int n=c_start; n<c3.size(); n++){
-                            if(seen[toInt(c3[n])]!=2) continue;
-                            seen[toInt(c3[n])]=3;
-                        }
-                        swapEqTofront(c1,3);
-                        swapEqTofront(c2,3);
-                        swapEqTofront(c3,3);
-                        for(int n=c_start; n<c3.size(); n++){
-                            if(seen[toInt(c3[n])]!=3) break;
-                            c2[n]=c1[n]=c3[n];
-                        }
-                }                  
-      }
-      for(int n=c1.size()-1; n>=c_start; n--) seen[toInt(c1[n])]=0;
-      PreEqLen=curLen;
-}
 
 inline void checker :: saveDetach(int level,int minNo)
 {
@@ -1173,7 +1121,7 @@ void checker :: restorelearnt23(int maxNo)
         }
     }
 }
-
+/*
 void checker :: blockbackward(int curNo, int begin)
 {   vec <Lit> lits;
     if(begin > 800000){
@@ -1235,7 +1183,7 @@ void checker :: blockbackward(int curNo, int begin)
    shiftproof += localproofn;
  //  printf(" localproofn=%d fail=%d\n",localproofn,fail);
 }
-
+*/
 void checker :: restoreTmpdetach( )
 {
     for(int k=0; k < tmpdetach.size(); k++){
@@ -1243,6 +1191,7 @@ void checker :: restoreTmpdetach( )
           CRef cr=learnts[No];
           if(cr == CRef_Undef) continue;
           if(ca[cr].detach()) attachClause(cr,No+1);
+          ca[cr].canDel(0);
      }
      tmpdetach.clear();
 }
@@ -1267,6 +1216,90 @@ void checker :: reAttachlearnt(int end)
    }
 }
 
+inline void checker :: swapEqTofront(Lit * lits, int sz, int eqVal)
+{     int j=0,k;
+      for(int i=0; i<sz; i++){
+           Lit lt=lits[i];
+           if(seen[toInt(lt)]!=eqVal) continue;
+           lits[i]=lits[j]; lits[j++]=lt;
+      }
+      if(j>11){
+          sort(lits, j);
+          return;
+      }
+      for(int i=1; i<j; i++){
+           Lit lt=lits[i];
+           int m=toInt(lt);
+           for(k=i-1; k>=0; k--){
+               if(m>toInt(lits[k])) break;
+               lits[k+1]=lits[k];
+           }
+           lits[k+1]=lt;
+     }
+}
+
+inline int checker :: moveEqTofront(vec <Lit> & preLit,vec <Lit> & curLit,vec <Lit> & nxtLit)
+{      
+      for(int i=preLit.size()-1; i>=0; i--) seen[toInt(preLit[i])]  =1;
+      for(int i=nxtLit.size()-1; i>=0; i--) seen[toInt(nxtLit[i])] +=2;
+      int en1=0,en2=0,en3=0;
+      for(int i=curLit.size()-1; i>=0; i--){
+             int lit=toInt(curLit[i]);
+             if(seen[lit]==1) en1++;
+             else if(seen[lit]==2) en2++;
+                  else if(seen[lit]==3) en3++;
+      }
+      swapEqTofront((Lit *)curLit, curLit.size(),3);
+      swapEqTofront((Lit *)curLit+en3, curLit.size()-en3,1);
+      swapEqTofront((Lit *)curLit+en1+en3, curLit.size()-en1-en3,2);
+      for(int i=preLit.size()-1; i>=0; i--) seen[toInt(preLit[i])]=0;
+      for(int i=nxtLit.size()-1; i>=0; i--) seen[toInt(nxtLit[i])]=0;
+      return en1+en2+en3;
+}
+
+inline void checker :: detachpartClause(int m,int localcut)
+{
+    CRef cr=learnts[m];
+    if( cr == CRef_Undef) return;
+    Clause & c=ca[cr];
+    if(c.size() > localcut){
+         if(c.detach()==0){
+             detachClause0(c, m+1);
+             c.detach(1);
+         }
+    }
+}      
+
+void checker :: DelInference(int & Delidx,int low)
+{ 
+    int ctime=Delqueue[Delidx].timeNo;
+    for(; Delidx<Delqueue.size() && ctime==Delqueue[Delidx].timeNo; Delidx++){
+         DelInfo DI=Delqueue[Delidx];
+         int No=DI.target.deletedNo;
+        // if(No<=0 || No<=low) continue;
+         if(No<=low) continue;
+         CRef cr=learnts[No-1];
+         if(cr != CRef_Undef){
+              Clause &  c = ca[cr];
+              if(c.detach()==0){
+                  detachClause0(c, No);
+                  c.detach(1);
+              }
+         }
+    }
+}
+
+int checker :: finddelstart(int begin, int end,int timeNo)
+{
+     if(begin >= end) {
+            if( timeNo > Delqueue[begin].timeNo) begin++;
+            return begin;
+     }
+     int mid= (begin + end)/2;
+     if( timeNo > Delqueue[mid].timeNo) return finddelstart(mid+1, end,timeNo);
+     return finddelstart(begin, mid-1,timeNo);    
+}     
+
 void checker :: eqvForwardshift(int ulit, int begin, int CurNo)
 {    Lit plit=toLit(ulit);
    
@@ -1279,10 +1312,8 @@ void checker :: eqvForwardshift(int ulit, int begin, int CurNo)
 
      if(CurNo-begin>30000) clearlearnt23();
 
-     vec <Lit> lits,prelits;
-     int i, j, k;
-     int ppIdx=-1,preIdx=-1,preEqvLen=0;
-     int bin_idx=-1;
+     vec <Lit> lits;
+     int i, bin_idx=-1;
      for(i=begin; i<= CurNo; i++){
            if(filePos[i] == -1){
                 learnts[i] = CRef_Undef;
@@ -1307,19 +1338,14 @@ void checker :: eqvForwardshift(int ulit, int begin, int CurNo)
            Clause &  c = ca[cr];
            c.detach(1);
            if(bin_idx < 0 && c.size() > 2) bin_idx=i;
+           int j;
            for(j=0; j<c.size(); j++) if(c[j] == plit) break;
            if(j>=c.size()) break;
-           if(j>0) { c[j]=c[0]; c[0]=plit;} 
-           if(preIdx !=-1) {
-                 moveEqTofront(preIdx, i, ppIdx, preEqvLen,1);
-           }
-           ppIdx=preIdx;
-           preIdx=i;
     }
     int end=i-1;
     if(bin_idx < 0 ) bin_idx=begin;
         
- //   printf(" end=%d i=%d bin_idx=%d block size=%d \n", end,i,bin_idx, i-begin);
+  // printf(" end=%d i=%d bin_idx=%d block size=%d \n", end,i,bin_idx, i-begin);
     
     if(end-begin<400){
            for(i=begin; i< CurNo; i++){
@@ -1373,13 +1399,14 @@ void checker :: eqvForwardshift(int ulit, int begin, int CurNo)
    tmp_antecedent.clear();
    tmp_unitID.clear();
    int shift=10000;
-   if(bin_idx<=begin+1) shift=200;
+  // if(bin_idx<=begin+1) shift=200;
    int bsize=end-bin_idx;
    if(bsize<280000) shiftmode=true;
    else  shiftmode=false;
    int localproof=0,fail;
-   int localcut = 4; 
-   int preNo=0;
+//   int localcut = 4; 
+   int localcut = 20; 
+   if(bsize>200000) { shift = 100000; localcut = 40;}
    static int dbig=0;
 
    tmpdetach.clear();
@@ -1387,93 +1414,94 @@ void checker :: eqvForwardshift(int ulit, int begin, int CurNo)
         int dbegin=1000;
         if(learnts.size()>40000000) dbegin=100000;
         else if(dbig) dbegin=50000;
-        DetachWatch(dbegin, begin-5000);
+        if(bsize>200000) DetachWatch(dbegin, begin-250000);
+        else DetachWatch(dbegin, begin-5000);
         reAttachlearnt(dbegin);
    }
    int loopNo = (end-bin_idx < 2*shift)? 1 : 0;
    int start=bin_idx;
+   vec <Lit> litg[3];
+   int delstart=finddelstart(0, Delqueue.size()-1,start);
 loop:
-    ok=true;
-    fail=0;
-    for(i=start; i<= end; i++){
-       if(i-shift>=bin_idx){
-                int m=i-shift;
-                CRef cr=learnts[m];
-                if( cr != CRef_Undef){
-                    Clause & c=ca[cr];
-                    if(c.size() > localcut){
-                        if(c.detach()==0){
-                             detachClause0(c, m+1);
-                             c.detach(1);
+   int Delidx=delstart;
+   ok=true;
+   fail=0;
+   int sz,nx=2, cu_i=-1;
+   for(i=0; i<3; i++) litg[i].clear();
+   for(i=start; i<= end+1; i++){
+        int cu=(nx+2)%3;
+        int pr=(nx+1)%3;
+        vec <Lit> & prLits=litg[pr];
+        vec <Lit> & cuLits=litg[cu];
+        vec <Lit> & nxLits=litg[nx];
+        nxLits.clear();
+        while (i<= end){
+              {if(Delqueue[Delidx].timeNo == i && i<end) DelInference(Delidx, bin_idx);}
+              if(i-shift>=bin_idx) detachpartClause(i-shift,localcut);
+              CRef cr=learnts[i];
+              if(  cr == CRef_Undef) {
+nextc:
+                    i++;
+                    continue;
+              }
+              if(verifyflag[i+1] & (VERIFIED | TMP_VERIFIED)) {
+                    Clause &  c2 = ca[cr];  
+                    if(c2.size()==2){
+                         Lit lt= (c2[0]==plit) ? c2[1] : c2[0];
+                        if(assigns[var(lt)] == l_Undef){
+                            cancelUntil(ilev+1);
+                            uncheckedEnqueue(lt,i+1);
+                            qhead=0; 
+                            ok=propagate3();
                         }
-                    }      
-                }
-         }
-         int cNo=i+1;
-         CRef cr2 = learnts[i];
-         if(cr2 == CRef_Undef){
-nextc: 
-               if(i > start){
-                     if(learnts[i-1] != CRef_Undef) attachClause(learnts[i-1],i);
-               }
-               continue;
-
-         }
-         Clause &  c2 = ca[cr2];
-         if(verifyflag[cNo] & (VERIFIED | TMP_VERIFIED)){
-                if(c2.size()==2){
-                    cancelUntil(ilev+1);
-                    if(assigns[var(c2[1])] == l_Undef){
-                        uncheckedEnqueue(c2[1],cNo);
-                        qhead=0; 
-                        propagate3();
                     }
-                }
-                goto nextc;
-         }
-      
-         int dlevel=decisionLevel();
-         if( dlevel > ilev+1){
-                 int sz=prelits.size();
-                 if(sz>c2.size()) sz=c2.size();
-                 for(j=1; j<sz; j++) if(prelits[j]!=c2[j]) break;
-                 if(j>=sz && sz>=prelits.size()){
-                        ca.free(cr2);
-                        learnts[i] = CRef_Undef;
-                        goto nextc;
-                 }
-                 if(ilev+j>=dlevel){
-                       if(!ok) goto sucess;
-                       j=dlevel-ilev;
-                 }
-                 cancelUntil(ilev+j);
-                 sz=prelits.size();
-                 int n=0;
-                 Lit lit;
-                 for(k=j; k<sz; k++){
-                      if(value(prelits[k]) == l_False) continue;
-                      n++;
-                      lit=prelits[k];
-                      if(n>1) break;
-                 }
-                 if(n==1 && assigns[var(lit)] == l_Undef){
-                        uncheckedEnqueue(lit,preNo);
-                        ok=propagate3();
-                   //     ok=propagate2();
-                     //   if(watchmode) ok=propagate();
-                     //   else ok = propagate2();
-                 }
-                 else ok=true;
-          } 
-          else {  cancelUntil(ilev+1);  j=1; ok=true;}
-sucess:
-          if(i>start){
-              if(learnts[i-1] != CRef_Undef) attachClause(learnts[i-1],i);
-          }
-          if(!ok) goto testok;
-          for(k=j; k<c2.size(); k++){
+                    attachClause(cr,i+1);
+                    goto nextc;
+              }
+              Clause & c =ca[cr];
+              for(int j=0; j<c.size(); j++) 
+                     if(plit !=c[j]) nxLits.push(c[j]);
+              break;
+        }
+//
+        while(cuLits.size()){
+              int cNo=cu_i+1;
+              moveEqTofront(prLits,cuLits,nxLits);
+              lits.clear();
+              for(int j=0; j<cuLits.size(); j++) seen[toInt(cuLits[j])]=2;
+              int eqvn=sz=prLits.size();
+              for(int j=0; j < sz; j++){
+                  Lit lt=prLits[j];
+                  if(seen[toInt(lt)]==2){
+                      lits.push(lt);
+                      seen[toInt(lt)]=0;
+                  }
+                  else if(eqvn == sz ) eqvn=j;
+              }
+              for(int j=0; j<cuLits.size(); j++){
+                   Lit lt=cuLits[j];
+                   if(seen[toInt(lt)]){
+                         lits.push(lt);
+                         seen[toInt(lt)]=0;
+                   }
+                   cuLits[j]=lits[j];
+              }
+              if(eqvn >= prLits.size() && eqvn>0 ){//subsume current clause
+                   ca.free(learnts[cu_i]);
+                   learnts[cu_i] = CRef_Undef;
+                   cuLits.shrink(cuLits.size()-eqvn);
+                   goto nextcls;
+              }
+              int dlevel=decisionLevel();
+              if( dlevel <= ilev+eqvn+1){
+                    if(!ok) goto sucess;
+                    eqvn=decisionLevel()-ilev-1;
+              }
+              cancelUntil(ilev+eqvn+1);
+              ok=true;
+              for(int k = eqvn; k <cuLits.size(); k++){
                   newDecisionLevel();
-                  Lit clit=~c2[k];
+                  Lit clit= ~cuLits[k];
                   if(value(clit) == l_True) continue;
                   if(value(clit) == l_False) {
                        int cv = var(clit);
@@ -1489,40 +1517,48 @@ sucess:
                   uncheckedEnqueue(clit);
                   ok=propagate3();
                   if(!ok)  break;
-           }
-testok:
-           if(ok) { 
+                 //   ok=propagate2();
+                 //   if(watchmode) ok=propagate();
+                 //   else ok = propagate2();
+              }
+              if(ok) { 
                    qhead=qhead0; 
                    ok = propagate2();
-           }
-           if(!ok){
-                if(shiftmode){
-                    tmp_antecedent.push(i);
-                    tmp_antecedent.push(cNo_Undef);
-                    if(tracecheck) tmp_unitID.push(0);
-                    if(loopNo == 0) verifyflag[cNo] |= TMP_VERIFIED;
-                 }
-                 else{
-                    if(tracecheck) printrace(cNo);
-                    verifyflag[cNo] |= VERIFIED;
-                 }
-                 localproof++; 
-           }
-           else fail++;
-           preNo=cNo;
-           prelits.clear();
-           for(k=0; k<c2.size(); k++) prelits.push(c2[k]);
-     }
-
-    // printf(" loop=%d %d verified inferences %d fails\n",loopNo,localproof,fail);
-    
+              }
+ sucess:
+              if(!ok){
+                   if(shiftmode){
+                        tmp_antecedent.push(cu_i);
+                        tmp_antecedent.push(cNo_Undef);
+                        if(tracecheck) tmp_unitID.push(0);
+                        if(loopNo == 0) verifyflag[cNo] |= TMP_VERIFIED;
+                   }
+                   else{
+                        if(tracecheck) printrace(cNo);
+                        verifyflag[cNo] |= VERIFIED;
+                   }
+                   localproof++; 
+              }
+              else fail++;
+              break;
+          }
+          if(cu_i >= 0 && cu_i <= end){
+              if(learnts[cu_i] != CRef_Undef) attachClause(learnts[cu_i],cu_i+1);
+          }
+nextcls:
+          cu_i=i;
+          nx = (nx+1)%3;
+    } 
+ 
+ // printf(" loop=%d %d verified inferences %d fails\n",loopNo,localproof,fail);
+ // fflush(stdout);
+  
     restoreTmpdetach( );
     restoreDetach();
     if(learnts.size()>20000000 && fail>40000) dbig=1;
 
-     if(loopNo == 0 && filePos.size()>35000000 && fail>5000) {
+    if(loopNo == 2 && filePos.size()>35000000 && fail>5000) {
          loopNo = 1;
-         ppIdx=-1,preIdx=-1,preEqvLen=0;
          start=bin_idx+100;
          for(i=bin_idx; i<=CurNo; i++){
              CRef cr = learnts[i];
@@ -1536,12 +1572,7 @@ testok:
                          detachClause0(c,i+1);
                          c.detach(1);
                    }
-                   for(j=0; j<c.size(); j++) if(c[j] == plit) break;
-                   if(j>0) { c[j]=c[0]; c[0]=plit;} 
                    if(verifyflag[i+1] & (VERIFIED | TMP_VERIFIED)) continue;
-                   if(preIdx !=-1) moveEqTofront(preIdx, i, ppIdx, preEqvLen,1);
-                   ppIdx=preIdx;
-                   preIdx=i;
              }
          }
 
@@ -1576,6 +1607,7 @@ testok:
                     detachClause0(c, No);
                     c.detach(1);
                  }
+                // c.canDel(0);
                  continue;
          }
          if(c.detach()) attachClause(cr, No);
@@ -1586,7 +1618,7 @@ testok:
 
  //printf(" %d localproofs %d fails, tmp_ant=%d \n",localproof,fail,tmp_antecedent.size());
 
-    if(fail>10000 && tmp_antecedent.size()==0) blockbackward(CurNo, bin_idx);
+  //  if(fail>10000 && tmp_antecedent.size()==0) blockbackward(CurNo, bin_idx);
 
     if(bin_idx+100<CurNo){
         newDecisionLevel();
@@ -1610,66 +1642,12 @@ testok:
     else shift_i=-1;
 }    
 
-void checker :: moveBlockEqTofront(int begin,int end)
-{     vec <Lit> lits;
-     int ppIdx=-1,preIdx=-1;
-     int preEqvLen=0;
-     if(end > learnts.size()) end = learnts.size();
-     for(int i=begin; i< end; i++){
-           if(filePos[i] == -1) continue;
-           CRef cr=learnts[i];
-           if(cr != CRef_Undef){
-                   if(ca[cr].size()==0) {ca.free(cr); goto readcls;}
-                   if(ca[cr].detach()==0) detachClause0(ca[cr], i+1);
-                   ca[cr].canDel(0);
-                   goto det;
-           }
-readcls:
-           readfile(i,lits);
-           cr=learnts[i] = ca.alloc(lits);
-           ca[cr].canDel(1);
-det:
-           ca[cr].detach(1);
-           if(preIdx !=-1) moveEqTofront(preIdx, i, ppIdx, preEqvLen,0);
-           ppIdx=preIdx;
-           preIdx=i;
-    }
-}
-
-void checker :: moveBlockUsedTofront(int begin,int end)
-{     vec <Lit> lits;
-     int ppIdx=-1,preIdx=-1;
-     int preEqvLen=0;
-     if(end > learnts.size()) end = learnts.size();
-     for(int i=begin; i< end; i++){
-           if(filePos[i] == -1) continue;
-           CRef cr=learnts[i];
-           if(cr != CRef_Undef){
-                   if(ca[cr].size()==0) {ca.free(cr); goto readcls;}
-                   if(ca[cr].detach()==0) detachClause0(ca[cr], i+1);
-                   ca[cr].canDel(0);
-                   goto det;
-           }
-readcls:
-           readfile(i,lits);
-           cr=learnts[i] = ca.alloc(lits);
-           ca[cr].canDel(1);
-det:
-           ca[cr].detach(1);
-           if(verifyflag[i+1] & VERIFIED) continue;
-           if( verifyflag[i+1] != USEDFLAG ) continue;
-           if(preIdx != -1) moveEqTofront(preIdx, i, ppIdx, preEqvLen,0);
-           ppIdx=preIdx;
-           preIdx=i;
-    }
-}
-
 void checker :: Localbackwardshift(int begin, int end)
 {   if(end<begin+10000 || begin<60000) return;
     static bool nofind=false;   
    
-//    printf("\n back B=%d E=%d ",begin, end);
-//    fflush(stdout);
+  //  printf("\n back B=%d E=%d ",begin, end);
+  //  fflush(stdout);
 
     int csz=clauses.size();  
     if(end<begin+15000 || csz>3000000 || nofind || (10*bintrn>9*csz && nVars()>150000) ){
@@ -1685,15 +1663,16 @@ void checker :: Localbackwardshift(int begin, int end)
     int  cNo,fail=0;
     int k,localproof=0;
     int clevel=decisionLevel ();
+    int trail0=trail.size();
     int shiftb=end-winsize+1;
    
     vec <Lit> lits;
+
     for(int i=mid+1; i < shiftb; i++){
           if(filePos[i] == -1) continue;
           CRef cr=learnts[i];
           if(cr != CRef_Undef){
                    if(ca[cr].size()==0) {ca.free(cr); learnts[i]=CRef_Undef; goto readcls;}
-                   if(ca[cr].detach()==0) detachClause0(ca[cr], i+1);
                    ca[cr].canDel(0);
                    goto det;
            }
@@ -1703,40 +1682,65 @@ readcls:
            if(lits.size() <=1 ) continue;
            cr=learnts[i] = ca.alloc(lits);
            ca[cr].canDel(1);
-det:
            ca[cr].detach(1);
+det:       ;
     }
+
+    vec <Lit> litg[2];
+    int cu=1,saveDel=lastDel;
+
     for(int i=end-1; i>=begin; i--){
-         shiftb--;
-         CRef cr=learnts[shiftb];
-         if( cr != CRef_Undef){
-               Clause &  c = ca[cr];
-               if(c.detach()){
-                     int j=0;
-                     for(int k=0; k<c.size(); k++) 
-                         if (value(c[k]) != l_False) {
-                             SwapLit(c[j],c[k]);
-                             j++; 
-                             if(j>1)break;
-                         }
-                     attachClause(cr, shiftb+1);
-               }
-         }
+         if(lastDel>=0 && i<=Delqueue[lastDel].timeNo) restoreDelClause(i-1,mid,1);
          if(filePos[i] == -1) continue;
          cNo=i+1;
          if(verifyflag[cNo] != USEDFLAG ) continue;
-         cr = learnts[i];
+         CRef cr = learnts[i];
          if(cr == CRef_Undef) continue;
          Clause &  c = ca[cr];
-         cancelUntil(clevel);
          if(c.detach()==0){
                detachClause0(c, cNo);
                c.detach(1);
          }
+
+         int sz,pr=(cu+1)%2;
+         vec <Lit> & prLits=litg[pr];
+         vec <Lit> & cuLits=litg[cu];
+         cuLits.clear();
+         for(k=0; k<c.size(); k++) cuLits.push(c[k]);
+         lits.clear();
+         for(int j=0; j<cuLits.size(); j++) seen[toInt(cuLits[j])]=2;
+         int eqvn=sz=prLits.size();
+         for(int j=0; j < sz; j++){
+              Lit lt=prLits[j];
+              if(seen[toInt(lt)]==2){
+                    lits.push(lt);
+                    seen[toInt(lt)]=0;
+              }
+              else if(eqvn == sz ) eqvn=j;
+         }
+         for(int j=0; j<cuLits.size(); j++){
+              Lit lt=cuLits[j];
+              if(seen[toInt(lt)]){
+                   lits.push(lt);
+                   seen[toInt(lt)]=0;
+              }
+              cuLits[j]=lits[j];
+         }
+         int dlevel=decisionLevel();
+         if( dlevel < clevel+eqvn) eqvn=dlevel-clevel;
+         cancelUntil(clevel+eqvn);
+         for(k=trail0; k<trail.size(); k++){
+              int confl=reason [var(trail[k])];
+              if(confl == cNo_Undef || confl <= i) continue;
+              cancelUntil(clevel);
+              eqvn=0;
+              break;
+         }
+        
          ok=true;
-         for(k=0; k<c.size(); k++){
+         for(k=eqvn; k<cuLits.size(); k++){
                  newDecisionLevel();
-                 Lit clit=~c[k];
+                 Lit clit=~cuLits[k];
                  if(value(clit) == l_True) continue;
                  if(value(clit) == l_False) {
                        int cv = var(clit); 
@@ -1750,8 +1754,6 @@ det:
                        break;
                  }
                  uncheckedEnqueue(clit);
-               //  if(watchmode) ok=propagate();
-               //  else ok=propagate2();
                  ok=propagate2();
                  if(!ok)  break;
          }
@@ -1761,15 +1763,17 @@ det:
          }
          else fail++;
     }
+    lastDel = saveDel;
+
     cancelUntil(clevel);
     restoreTmpdetach( );
-   int delstart=end-2000;
+   int delbegin=end-2000;
    for(int i=mid+1; i<end; i++){
          CRef cr = learnts[i];
          if(cr == CRef_Undef) continue;
          int No=i+1;
          Clause &  c = ca[cr];
-         if(i>=delstart) c.canDel(0);
+         if(i>=delbegin) c.canDel(0);
          else{
              if(c.canDel()){
                  if( c.detach()==0){
@@ -1784,12 +1788,11 @@ det:
 
     prePropagate((begin+end)/2);
  
- //   printf(" %d verified inferences, %d fails ",localproof,fail);
+   // printf(" %d verified inferences, %d fails ",localproof,fail);
 
     if(fail>2000 && fail>3*localproof) nofind=true;
     shiftproof += localproof;
 }    
-
 
 void checker :: clearAllwatch()
 {
@@ -2285,7 +2288,7 @@ int checker :: backwardCheck()
     for(int i=end; i>=0; i--){
        if(i%1000==0){
             double check_time = cpuTime();
-            if(check_time-initial_time>25000) {
+            if(check_time-initial_time>45000) {
                    printf("c time out \n");
                    return 0;
            }
@@ -2623,7 +2626,7 @@ int checker :: RATCheck()
     vec<int> *ridx;
     eqvForwardmode=0;
     for(int i=end; i>=0; i--){
-           if(lastDel>=0 && i<=Delqueue[lastDel].timeNo) restoreDelClause(i);
+           if(lastDel>=0 && i<=Delqueue[lastDel].timeNo) restoreDelClause(i, 0,0);
            if(filePos[i] == -1) continue;
            if(learnts[i] == CRef_Undef){
               lits.clear();
@@ -2681,8 +2684,6 @@ int checker :: RATCheck()
                  else{
                       lits2.clear();
                       Clause & c = ca[cr];
-                     // if(c.disk()) readfile(cno-1,lits2);
-                     // else
                       for(int k=0; k<c.size(); k++) lits2.push(c[k]);
                  }
                  lits3.clear();
@@ -2851,7 +2852,6 @@ void checker :: removeRepeatedCls(int end,int maxlevel)
 //
           if(c.detach()) attachClause(cr, i+1);
     }
-    //if(verbosity) printf("c detach # =%d \n",detachlist.size());
 } 
 
 inline void checker :: DelRedundancyLit(vec <Lit> & lits,int No)
@@ -2971,7 +2971,6 @@ void checker :: DetachWatch2(int begin, int end)
         for (int s = 0; s < 2; s++){
              Lit p = mkLit(v, s);
              detachWatch(watches[p],begin,end);
-         //    detachWatch(watchesBin[p],begin,end);
         }
     }
 }
@@ -3051,7 +3050,7 @@ void checker :: activateDelinfo(int & end, vec <UnitIndex> & c_unit)
          }
 
          if(i>=1000000 && (i%200000==0)) {
-                  if(verbosity)  printf("c i=%d \n",i);
+                  //if(verbosity)  printf("c i=%d \n",i);
                   clearHashtbl(i);
                   if(i>=end-1000000) garbageCollect(); 
          }  
@@ -3131,9 +3130,6 @@ nexstep:
            if(cr == CRef_Undef) continue;
            Clause &  c = ca[cr];
            c.freesize(0);
-          // if(tracecheck) continue;
-          // unsigned int newsize=c.size()-c.freesize();
-          // c.size(newsize);
     }
     for(int v=0; v<nVars(); v++){
           if(assigns[v] == l_Undef) restoreTrueClause(v,end);
@@ -3299,48 +3295,44 @@ void checker :: DetachDelClause()
       }
 }
 
-struct delInfo_lt {
-    delInfo_lt() {} 
-    bool operator () (DelInfo x, DelInfo y) { 
-       return x.target.deletedNo < y.target.deletedNo;
-    }    
-};
-
-void checker :: restoreDelClause(int CurNo)
+void checker :: restoreDelClause(int CurNo,int low, int candel_flag)
 { 
     int end=lastDel;
     for(; lastDel>=0; lastDel--){
            DelInfo DI=Delqueue[lastDel];
            if(DI.timeNo<CurNo-10) break;
     }
+    vec <int> cNo;
     int begin=lastDel+1;
-    sort((DelInfo *)Delqueue+begin, end-lastDel, delInfo_lt());
- 
-    vec <Lit> lits;
     for(int i=begin; i<=end; i++){
-           DelInfo DI=Delqueue[i];
-           int No=DI.target.deletedNo;
+           int No=Delqueue[i].target.deletedNo;
+           cNo.push(No);
+    }
+    sort(cNo);
+
+    vec <Lit> lits;
+    for(int i=0; i<cNo.size(); i++){
+           int No = cNo[i];
            if(No>0){
-                   No--;
+                   No--;;
                    CRef cr=learnts[No];
                    if(cr != CRef_Undef){
                           if(ca[cr].detach()) attachClause(cr,No+1);
-                          ca[cr].canDel(0);
+                          if(candel_flag==0) ca[cr].canDel(0);
                           continue;
                    }
-                   if(No>=CurNo){
-                          learnts[No]=CRef_Undef;
-                          continue;
-                   }
+                   if(No>=CurNo || candel_flag) continue;
+                  // if(No>=CurNo) continue;
                    readfile(No, lits);
                    cr = ca.alloc(lits);
                    learnts[No]=cr;
-                   if(lits.size() <= len_lim && watchmode){
+                   if(lits.size() <= len_lim && watchmode && candel_flag==0){
                           learnt23.push(No);//3
                           ca[cr].detach(1);
                    }
                    else   attachClause2(cr,No+1);
-            }
+                   if(No>low) ca[cr].canDel(candel_flag);
+           }
            else{
                   CRef cr = clauses[-No];
                   Clause &  c = ca[cr];
