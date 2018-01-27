@@ -1,6 +1,6 @@
 /************************************************************************************
 Copyright (c) 2018, Jingchao Chen (chen-jc@dhu.edu.cn)
-Jan. 20, 2018
+Jan. 25, 2018
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -1672,9 +1672,10 @@ void checker :: Localbackwardshift(int begin, int end)
           if(filePos[i] == -1) continue;
           CRef cr=learnts[i];
           if(cr != CRef_Undef){
-                   if(ca[cr].size()==0) {ca.free(cr); learnts[i]=CRef_Undef; goto readcls;}
-                   ca[cr].canDel(0);
-                   goto det;
+                 if(ca[cr].size()==0) {ca.free(cr); learnts[i]=CRef_Undef; goto readcls;}
+                 if(ca[cr].detach()==0) detachClause0(ca[cr], i+1);
+                 ca[cr].canDel(0);
+                 goto det;
            }
 readcls:
            if(i<begin) continue;
@@ -1682,8 +1683,8 @@ readcls:
            if(lits.size() <=1 ) continue;
            cr=learnts[i] = ca.alloc(lits);
            ca[cr].canDel(1);
-           ca[cr].detach(1);
 det:       ;
+           ca[cr].detach(1);
     }
 
     vec <Lit> litg[2];
