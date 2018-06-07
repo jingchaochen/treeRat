@@ -64,7 +64,6 @@ public:
         UnitIndex(int i, Lit l) {idx=i, lit=l;}
     };
     vec <UnitIndex> cur_unit, save_unit;
-    int *occLit;
    
     vec <DelInfo> Delqueue;
     int lastDel,Delq_active;
@@ -72,29 +71,19 @@ public:
    
     void DelRedundancyLit(vec <Lit> & lits,int No);
     void activateDelinfo(int & end, vec <UnitIndex> & c_unit);
-    int  match(int h, Lit * lits, int len,int curNo);
+    int  match(int h, Lit * lits, int len,int curNo,bool detachflag=false);
     int  match3(int h, Lit * lits);
     vec<int> * hashtbl;
     void clearHashtbl(int cur_delno);
+    void movelit_att( Clause &  c, int cno, CRef cr);
     void restoreDelClause(int CurNo, int low=0, int candel_flag=0);
-    void DetachDelClause();
     void DetachWatch(int begin, int end);
-    void DetachWatch2(int begin, int end);
-    void detachWatch( vec<Watcher>& ws, int begin, int end);
+    void detachWatch( vec<Watcher> & ws, int begin, int end);
     void detachWatch( vec<WatcherL>& ws, int begin, int end);
-    void detachWatcheck( vec<WatcherL>& ws, int begin, int end);
-    void DetachWatcheck(int begin, int end);
-    void detachWatch23( vec<Watcher>& ws,  int end);
-    void detachWatch23( vec<WatcherL>& ws, int end);
-    void deletewatch(int CurNo);
-    void clearlearnt23(int maxLimit, bool attachflag);
-    void clearlearnt23();
-    void restorelearnt23(int MaxNo);
-
+  
     FILE *rat_fp;
     void  readratOutput(char * rupfile);
     int   forwardCheck();
-    void  reducebufferlearnt();
     bool  finddetachUnit(vec <int> & detachNo);
 
     void  readfile(int i,vec <Lit>  & lits);
@@ -110,18 +99,16 @@ public:
     void  restoreTrueClause(int v, int MaxNo);
     void  rebuildwatch(int CurNo);
     bool  restoreAuxUnit();
-
+   
     void extractUnit(int & unitproof);
     void removeProofunit( vec <UnitIndex> & unit);
     int  decisionLevel () {return trail_lim.size();}
-    int  attClauses, origVars,cutLen;
+    int  origVars,cutLen;
     void reAttachlearnt(int end);
     void eqvForwardshift (int ulit, int begin, int CurNo);
-    void blockbackward(int curNo, int begin);
     void restoreTmpdetach( );
     void swapEqTofront(Lit * lits, int sz, int eqVal);
     int  moveEqTofront(vec <Lit> & preLit,vec <Lit> & curLit,vec <Lit> & nxtLit);
-
     void Localbackwardshift(int begin, int end);
     void detachpartClause(int m,int localcut);
     void DelInference(int & Delidx,int low);
@@ -140,7 +127,7 @@ public:
     int       verbosity;
  
   protected:
-    OccLists<Lit, vec<WatcherL> >  watches; 
+    OccLists<Lit, vec<WatcherL> >  watches, corewatch; 
     OccLists<Lit, vec<Watcher> >   watchesBin;    
  
     CRef getCref(int clsNo){
@@ -161,9 +148,9 @@ public:
     void     newDecisionLevel ();                // Begins a new decision level.
     void     uncheckedEnqueue (Lit p, int from=cNo_Undef); // Enqueue a literal. 
     bool     propagateMax      (int maxCNo);     // Perform unit propagation. Returns conflict clause.
-    bool     propagate         ();
-    bool     propagate2        ();
     bool     propagate3        ();
+    bool     propagateCore     ();
+    void     clearCoreflag     (int last);
 
     bool     double_propagate (int maxCNo);
     void     cancelUntil      (int level);      // Backtrack until a certain level.
@@ -173,9 +160,8 @@ public:
     void     analyze_used_tmp_trace(int confl);
     bool     shiftmode;
     void     analyze_used(int confl);
-
+  
     void     attachClause (CRef cr, int clsNo);    // Attach a clause to watcher lists.
-    void     attachClause2(CRef cr, int clsNo);
     void     detachClause0(Clause & c, int clsNo);
     CRef     detachClause     (int clsNo);        // Detach a clause to watcher lists.
     int      remNum;
@@ -205,16 +191,13 @@ public:
     void     clearWatch( vec<WatcherL> & wsL);
     void     setvarLevel(vec <UnitIndex> & c_unit);
     void     removeRepeatedCls(int end,int maxlevel);
-    void     detachWatch( vec<Watcher>& ws);
-    void     detachWatch( vec<WatcherL>& ws);
-
-    void     offtrueClause(vec <Lit> & lits,int No);
+   
     void     offtrueClause(CRef cr,int No,int maxlevel);
    
     void     relocAll (ClauseAllocator& to);
 
 //rat check
-    bool  conflictCheck(int No, vec<Lit> & lits,int & begin,int end);
+    bool  conflictCheck(int lrn_No, vec<Lit> & lits);
     char *RATvar;
     vec<int> *RATindex;
     void  setRATvar();

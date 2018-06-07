@@ -103,7 +103,7 @@ typedef RegionAllocator<uint32_t>::Ref CRef;
 
 class Clause {
     struct {
-      unsigned freesize  : 3;
+      unsigned coreC     : 1;
       unsigned detach    : 1;
       unsigned canDel    : 1;
       unsigned reuse     : 1;
@@ -114,7 +114,7 @@ class Clause {
     friend class ClauseAllocator;
     template<class V>
     Clause(const V & ps, bool learnt) {
-        header.freesize  = 0;
+        header.coreC  = 0;
         header.detach    = 1;
         header.canDel    = 0;
         header.reuse     = 0;
@@ -125,8 +125,8 @@ class Clause {
 public:
     int          size        ()      const   { return header.size; }
     void         size        (uint32_t sz)   { header.size=sz;  }
-    uint32_t     freesize    ()      const   { return header.freesize;}
-    void         freesize    (uint32_t m)    { header.freesize = m; }
+    uint32_t     coreC    ()      const   { return header.coreC;}
+    void         coreC    (uint32_t m)    { header.coreC = m; }
     uint32_t     detach      ()      const   { return header.detach;}
     void         detach      (uint32_t df)   { header.detach = df;}
     uint32_t     canDel      ()      const   { return header.canDel;}
@@ -179,7 +179,7 @@ class ClauseAllocator : public RegionAllocator<uint32_t>
     {
         Clause& c = operator[](cr);
         cr = to.alloc(c);
-        to[cr].freesize(c.freesize());
+        to[cr].coreC(c.coreC());
         to[cr].detach(c.detach());
         to[cr].canDel(c.canDel());
         to[cr].reuse  (c.reuse());
