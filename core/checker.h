@@ -65,7 +65,7 @@ public:
     };
     vec <UnitIndex> cur_unit, save_unit;
    
-    vec <DelInfo> Delqueue;
+    vec <DelInfo> Delqueue,saveDelqueue;
     int lastDel,Delq_active;
     void  readdelclause(int i,vec <Lit>  & lits);
    
@@ -196,13 +196,19 @@ public:
    
     void     relocAll (ClauseAllocator& to);
 
+    int      auxUnitmode;
+	bool     checkRup(int LerantNo,vec <Lit> & lits);
+    int      unitproof, proofn, unproofn,refound,t_sz0;
+	vec<bool> clauseDel,learntDel;
+     
 //rat check
+    vec<int> RatcheckCls;
     bool  conflictCheck(int lrn_No, vec<Lit> & lits);
     char *RATvar;
     vec<int> *RATindex;
     void  setRATvar();
     void  setRATindex (Clause & c, int clsNo);
-    int   removeRATindex (vec<Lit> & lits, int clsNo);
+    void  removeRATindex (vec<Lit> & lits, int clsNo);
     void  buildRATindex ();
     int   RATCheck();
     bool  refind(int & cls_i, int lrn_i);
@@ -223,6 +229,7 @@ public:
     void printRatBody(int clsNo);
     void printraceEnd();
     void TraceOrigClause();
+    void printbody();
 
     void printEqRat1(int RatNo, vec <int> & lits);
     void printEqRat2(int clsNo, int RatNo, vec <int> & lits);

@@ -1,6 +1,6 @@
 /************************************************************************************
-Copyright (c) 2018, Jingchao Chen (chen-jc@dhu.edu.cn)
-June 8, 2018
+Copyright (c) 2019, Jingchao Chen (chen-jc@dhu.edu.cn)
+Feb. 5, 2019
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -1262,7 +1262,6 @@ nextcls:
     } 
  
     //printf(" %d verified inferences %d fails\n",localproof,fail);
-   // fflush(stdout);
   
     restoreTmpdetach( );
     restoreDetach();
@@ -1523,7 +1522,7 @@ void checker :: removeTrailUnit(Lit uLit,int CurNo)
 {   
      int lev=decisionLevel()-1;
      if(lev>=0 && trail[trail_lim[lev]]== uLit){
-cancel:
+//cancel:
            cancelloadtrueCls(lev, CurNo);
            if(trueClause){
                  restoreTrueClause(var(uLit),CurNo);
@@ -1541,7 +1540,7 @@ cancel:
                            cancelloadtrueCls(lev, CurNo);
                            return;
                      }
-                goto cancel;      
+  //              goto cancel;      
             }
             else printf("c error lev=%d uLit=%d CurNo=%d \n",lev,toIntLit(uLit),CurNo);
      }
@@ -1834,6 +1833,56 @@ bool checker :: refind(int & cls_i, int lrn_i)
 }
 
 extern double initial_time;
+bool checker :: checkRup(int LerantNo, vec <Lit> & lits)
+{
+    int orglevel=decisionLevel();
+    if(refound){
+        qhead=t_sz0;
+        newDecisionLevel();
+        propagate3();
+        refound=0;
+    }
+  	int v0=var(lits[0]);
+    int saveID=unitClauseID[v0];
+    unitClauseID[v0] = 0;
+    ok=isconflict(lits);
+    if(!ok) {
+        refound=1;
+        int pre_qhead=-1;
+  retry:     
+        while (!ok && pre_qhead != trail.size()){
+            pre_qhead=trail.size();
+            qhead=0;
+            ok=!propagate3();
+        }
+
+        if(!ok && auxUnitmode==0){
+            auxUnitmode=1;
+            ok=restoreAuxUnit();
+            if(!ok){ pre_qhead=-1;  goto retry;}
+        }
+	
+        if(!ok && detachlist.size()){
+            pre_qhead=qhead = trail.size();
+            ok=finddetachUnit(detachlist);
+            if(!ok && pre_qhead != trail.size()) goto retry;
+        }
+
+    //      if(!ok) { unproofn++; break;}
+    //  if(!ok && unproofn==0){
+    //      ok=refind(clause_i,iLerantNo);
+    //  }
+
+        cancelUntil(orglevel);
+        if(auxUnitmode==1){ 
+            auxUnitmode=2; 
+            restoreAuxUnit();
+        }
+    }
+    cancelUntil(orglevel);
+    unitClauseID[v0]=saveID;
+	return ok;
+}
                                                     
 int checker :: backwardCheck()
 {   
@@ -1859,10 +1908,11 @@ int checker :: backwardCheck()
     learnts.min_memory(maxNo);
    
     vec <Lit> lits;
-    int unproofn=0, proofn=0, unitproof=0;
+    unproofn=proofn=unitproof=0;
+
     cutLen=0x5fffffff;
     extractUnit(unitproof);
-    int t_sz0=trail.size();
+    t_sz0=trail.size();
     printf("c %d out of %d units are verified in initial step\n",unitproof,cur_unit.size());
  
     if(maxdisFirstvar<5000 || lit_begin_end.size()<=180 || nVars()<=origVars+50){
@@ -1871,6 +1921,9 @@ int checker :: backwardCheck()
     }
     else eqvForwardmode=1;
     winmode=2;
+
+    saveDelqueue.clear();
+    for(int i=0; i<Delqueue.size(); i++) saveDelqueue.push(Delqueue[i]);
      
     int  end = filePos.size()-1;
     activateDelinfo(end,cur_unit);
@@ -1906,8 +1959,8 @@ int checker :: backwardCheck()
         if(!ok) printEmptyclause2();
     }
     vec <int> varUnitID;
-    int  auxUnitmode=0, backshiftbegin=-1, shiftmode=false;
-    int  refound=0;
+    int  backshiftbegin=-1, shiftmode=false;
+    auxUnitmode=refound=0;
     shift_i=-1;
     for(int i=end; i>=0; i--){
        if(i%1000==0){
@@ -2061,77 +2114,36 @@ int checker :: backwardCheck()
        } 
        if(minClauseNo2 == -1 && eqvForwardmode && (minClauseNo1>0 || lit_begin_end.size()< 2))
              prePropagate(i);
-  
-       int orglevel=decisionLevel();
-       if(refound){
-             qhead=t_sz0;
-             newDecisionLevel();
-             propagate3();
-             refound=0;
-       }    
-       int v0=var(lits[0]);
-       int saveID=unitClauseID[v0];
-       unitClauseID[v0] = 0;
-       ok=isconflict(lits);
-       if(!ok) {
-             refound=1;
-             int pre_qhead=-1;
-          retry:     
-             while (!ok && pre_qhead != trail.size()){
-                  pre_qhead=trail.size();
-                  qhead=0;
-                  ok=!propagate3();
-             }
-             if(!ok && auxUnitmode==0){
-                  auxUnitmode=1;
-                  ok=restoreAuxUnit();
-                  if(!ok){ pre_qhead=-1;  goto retry;}
-             }
-             if(!ok && detachlist.size()){
-                   pre_qhead=qhead = trail.size();
-                   ok=finddetachUnit(detachlist);
-                   if(!ok && pre_qhead != trail.size()) goto retry;
-             }
-//             if(!ok) { unproofn++; break;}
-           //  if(!ok && unproofn==0){
-           //      ok=refind(clause_i,i);
-           //  }
-
-              cancelUntil(orglevel);
-              if(auxUnitmode==1){ 
-                     auxUnitmode=2; 
-                     restoreAuxUnit();
-              }
-
-       }
-       if(!ok) {
+//
+        ok=checkRup(i, lits);
+        if(!ok) {
             if(unproofn==0) filePos.shrink_(filePos.size()-1-i);
             unproofn++;
-       }
-       else {
+			RatcheckCls.push(i);
+        }
+        else {
              verifyflag[i+1] = VERIFIED;
              if(tracecheck) printrace(i+1);
              if(lits.size()==1) unitproof++;
              else proofn++;
              coreNum--;
              if(coreNum>70000) clearCoreflag(i);
-       }
-       cancelUntil(orglevel);
-       unitClauseID[v0]=saveID;
+        }
    }
-   printf("\nc %d inferences, %d units are verified\n",proofn,unitproof);
-   if(shiftusedproof) 
-         printf("c %d out of %d verified inferences is useful in shift step\n",shiftusedproof,shiftproof);
-   else  printf("c %d inferences are verified in shift step\n",shiftproof);
-   printf("c %d deleted inferences\n",Delqueue.size());
    if(unproofn){
-         printf("\nc so far %d inferences are not verified\n",unproofn);
+         printf("\nc %d inferences are not verified in RUP check step\n",unproofn);
          auxUnit.clear();
          coreMode=0;
          clearCoreflag(0);
          return RATCheck();
    }
 
+   printf("\nc %d inferences, %d units are verified\n",proofn,unitproof);
+   if(shiftusedproof) 
+         printf("c %d out of %d verified inferences is useful in win shift step\n",shiftusedproof,shiftproof);
+   else  printf("c %d inferences are verified in win shift step\n",shiftproof);
+   printf("c %d deleted inferences\n",Delqueue.size());
+ 
    printf("c proof is verified\n");
    fclose(rat_fp);
    if(tracecheck) fclose(traceOutput);
@@ -2155,7 +2167,7 @@ void checker :: setRATvar()
     RATvar = (char  * ) calloc (nVars()+1, sizeof(char));
     for(int  i=0; i<filePos.size(); i++){
            if(filePos[i] == -1) continue;
-           if(verifyflag[i+1] != USEDFLAG) continue;
+           if(verifyflag[i+1] & VERIFIED) continue;
            readfile(i,lits);
            RATvar[var(lits[0])]=1;
     }
@@ -2170,16 +2182,13 @@ inline void checker :: setRATindex (Clause & c, int clsNo)
     }
 }
 
-inline int checker :: removeRATindex (vec<Lit> & lits, int clsNo)
+inline void checker :: removeRATindex (vec<Lit> & lits, int clsNo)
 {  
-    int delno=0;
     for(int j=0; j<lits.size(); j++) {
           if(RATvar[var(lits[j])]){
-               delno++;
                remove(RATindex[toInt(lits[j])], clsNo);
           }
      }
-     return delno;
 }
 
 void checker :: buildRATindex ()
@@ -2222,7 +2231,9 @@ bool checker :: conflictCheck(int lrn_No, vec<Lit> & lits)
 int checker :: RATCheck()
 {
     cancelUntil(0);
-    int t_sz0=trail.size();
+    t_sz0=trail.size();
+    auxUnitmode=refound=0;
+ 
     setRATvar();
     buildRATindex();
     cutLen=0x5fffffff;
@@ -2234,15 +2245,41 @@ int checker :: RATCheck()
             cur_unit.push(save_unit[i]);
             unitClauseID[var(save_unit[i].lit)]=save_unit[i].idx+origIDSize+1;
     }
+	Delqueue.clear();
+    for(int i=0; i<saveDelqueue.size(); i++) Delqueue.push(saveDelqueue[i]);
+    saveDelqueue.clear(true);
+	
     activateDelinfo(end, cur_unit);
-     
+      
     CRef cr;
     vec<Lit> lits,lits2,lits3;
-    int pivot;
-    int proofn=0,unitproof=0;
+    int pivot,RatProofn=0,RatUnitProof=0,Ratk=0;
     vec<int> *ridx;
     eqvForwardmode=0;
     vec <int> varUnitID;
+	
+    int preDelID=-1;
+	learntDel.growTo(end+1);
+	clauseDel.growTo(clauses.size());
+    for(int i=0; i<=end; i++) learntDel[i]=0;
+    for(int i=0; i<=clauses.size(); i++) clauseDel[i]=0;
+  
+    for(int i=0; i<Delqueue.size(); i++){
+        int No=Delqueue[i].target.deletedNo;
+        if(No<=0) clauseDel[-No]=1;
+        else if(No<=end) learntDel[No]=1;
+        if(tracecheck){
+			int ID=getClauseID(Delqueue[i].timeNo+1);
+			if(ID != preDelID){
+                if(preDelID==-1) fprintf(traceOutput, "%i d ", ID);
+				else 	         fprintf(traceOutput, "0\n%i d ", ID);
+            }
+			fprintf(traceOutput, "%i ", getClauseID(No));
+			preDelID=ID;
+		}	
+    }
+    if(tracecheck && preDelID != -1) fprintf(traceOutput, "0\n");
+
     for(int i=end; i>=0; i--){
            if(lastDel>=0 && i<=Delqueue[lastDel].timeNo) restoreDelClause(i, 0,0);
            if(filePos[i] == -1) continue;
@@ -2285,31 +2322,38 @@ int checker :: RATCheck()
                if(verifyflag[i+1] & VERIFIED) continue;
                readfile(i,lits);
           }
-          if(tracecheck) printracHead(i+1,lits);
-
-          if(lits.size() == 1) removeTrailUnit(lits[0],i);
-          int curLevel=decisionLevel();
-          int rno=removeRATindex (lits, i+1);
-          if(rno==0) {
-                 if(!conflictCheck(i, lits)){
-                     printf("c the %d-th inference RAT check fails!\n",i);
-                     return 0;
-                 }
-                 goto nextclase;
-          }
-//
-          if(tracecheck) printracHead(i+1, lits);
-          pivot=toInt(~lits[0]);
+		  
+		  pivot=toInt(~lits[0]);
+ 	  	  int curLevel=decisionLevel();
+		  if(tracecheck) printracHead(i+1, lits);
+          while(Ratk<RatcheckCls.size()){
+			  if(RatcheckCls[Ratk]<=i) break;
+			  Ratk++;
+		  }
+		  if(Ratk>=RatcheckCls.size() || RatcheckCls[Ratk]<i){ // RUP check
+               if(checkRup(i, lits)){
+                     if(tracecheck) printbody();
+                     if(lits.size()==1) unitproof++;
+                     else proofn++;
+                     goto nextclase;
+			   }
+		  }
+    	  removeRATindex (lits, i+1);
           ridx = & RATindex[pivot];
           for(int j=0; j < ridx->size(); j++){
                  newDecisionLevel();
                  int cno=(*ridx)[j];
                  int maxCno=1;
-                 if(cno <= 0) cr=clauses[-cno];
+                 if(cno <= 0){
+					 cr=clauses[-cno];
+					 if(clauseDel[-cno]) continue;
+				 }
                  else{
-                         if(cno>i) continue;
-                         cr=learnts[cno-1];
-                         maxCno=cno;
+                     if(cno>i) continue;
+					 if(learntDel[cno]) continue;
+                     verifyflag[cno] |= USEDFLAG;
+                     cr=learnts[cno-1];
+                     maxCno=cno;
                  }
                  if(cr == CRef_Undef) readfile(maxCno-1,lits2);
                  else{
@@ -2324,20 +2368,22 @@ int checker :: RATCheck()
                        lits3.push(lits2[k]);
                  }
                 
-                 if(!conflictCheck(i,lits3)){
-                     printf("c The %d-th inference RAT check fails \n",i);
-                     return 0;
-                 }
+                 if(!checkRup(i, lits3))
+                    if(!conflictCheck(i,lits3)){
+                        printf("c The %d-th inference RAT check fails \n",i);
+                        return 0;
+                    }
                  if(tracecheck) printRatBody(cno);
           }
+          if(lits.size()==1) RatUnitProof++;
+          else RatProofn++;
 nextclase: 
           cancelUntil(curLevel);
           verifyflag[i+1] = VERIFIED;
           if(tracecheck) printraceEnd();
-          if(lits.size()==1) unitproof++;
-          else proofn++;
      }
-     printf("c %d verified inferences in RAT check\n",proofn);
+     printf("\nc %d inferences, %d units are verified\n",proofn,unitproof);
+     printf("c %d units and %d inferences are verified in RAT check\n",RatUnitProof,RatProofn);
      printf("c proof is verified \n");
      delete []RATindex;
      free(RATvar);
@@ -2427,8 +2473,12 @@ void checker :: removeRepeatedCls(int end,int maxlevel)
           repeat++;
  nextc: ;
     }
-    printf("c remove %d repeated inferences\nc %d binary,ternary inferences\n",repeat,binterN);
-    clsno.clear(true);
+	static int dis=1;
+	if(dis) {
+		printf("c remove %d repeated inferences\nc %d binary,ternary inferences\n",repeat,binterN);
+        dis=0;
+	}
+	clsno.clear(true);
     
     detachlist.clear();
     for(int i=0; i<=end; i++){
@@ -2550,7 +2600,6 @@ void checker :: activateDelinfo(int & end, vec <UnitIndex> & c_unit)
    }
    setvarLevel(c_unit);
  
-  // int maxhsize=0;
    auxUnit.clear();
    hashtbl = new vec<int>[HASHSIZE];
    for(int i=0; i<HASHSIZE; i++) hashtbl[i].clear();
@@ -2673,11 +2722,7 @@ void checker :: activateDelinfo(int & end, vec <UnitIndex> & c_unit)
                              goto nextc;
                         }
                   }
-         
                   hashtbl[h].push(i+1);
-                //  if(verbosity && maxhsize<hashtbl[h].size()){
-                //     maxhsize=hashtbl[h].size();
-                //  }
               }
          }
          nextc: ;
@@ -2831,11 +2876,13 @@ inline void checker :: movelit_att( Clause &  c, int cno, CRef cr)
 }
 
 void checker :: restoreDelClause(int CurNo,int low, int candel_flag)
-{ 
+{   
+    int delta=clauseDel.size()? 1 : 10;
     int end=lastDel;
     for(; lastDel>=0; lastDel--){
            DelInfo DI=Delqueue[lastDel];
-           if(DI.timeNo<CurNo-10) break;
+           //if(DI.timeNo<CurNo-10) break;
+           if(DI.timeNo<CurNo-delta) break;
     }
     vec <int> cNo;
     int begin=lastDel+1;
@@ -2849,29 +2896,28 @@ void checker :: restoreDelClause(int CurNo,int low, int candel_flag)
     for(int i=0; i<cNo.size(); i++){
            int No = cNo[i];
            if(No>0){
-                   No--;;
-                   CRef cr=learnts[No];
-                   if(cr != CRef_Undef){
+			      if(No<learntDel.size()) learntDel[No]=0;
+                  No--;;
+                  CRef cr=learnts[No];
+                  if(cr != CRef_Undef){
                           if(ca[cr].detach()) //attachClause(cr,No+1);
-                                              movelit_att(ca[cr], No+1,cr);
+                          movelit_att(ca[cr], No+1,cr);
                           if(candel_flag==0) ca[cr].canDel(0);
                           continue;
-                   }
-                   if(No>=CurNo || candel_flag) continue;
-                   readfile(No, lits);
-                   cr = ca.alloc(lits);
-                   learnts[No]=cr;
+                  }
+                  if(No>=CurNo || candel_flag) continue;
+                  readfile(No, lits);
+                  cr = ca.alloc(lits);
+                  learnts[No]=cr;
                 // attachClause2(cr,No+1);
-                   movelit_att(ca[cr], No+1,cr);
-                   if(No>low) ca[cr].canDel(candel_flag);
+                  movelit_att(ca[cr], No+1,cr);
+                  if(No>low) ca[cr].canDel(candel_flag);
            }
            else{
+			      if(clauseDel.size()) clauseDel[-No]=0;
                   CRef cr = clauses[-No];
                   Clause &  c = ca[cr];
-                  if(c.detach()){
-              //         attachClause2(cr,No);
-                         movelit_att(c, No,cr);
-                  }
+                  if(c.detach()) movelit_att(c, No,cr);
            }
       }
 }
@@ -3087,20 +3133,25 @@ void checker :: printracHead(int clsNo, vec <Lit> & lits)
         if( cr != CRef_Undef){
               Clause & c = ca[cr];
               for (int i =0; i < c.size(); i++) fprintf(traceOutput, "%i ", toIntLit(c[i]));
+              fprintf(traceOutput, "0 ");
               return;
         }
         readfile(clsNo-1, lits);
     }
     for (int i =0; i < lits.size(); i++) fprintf(traceOutput, "%i ", toIntLit(lits[i]));
+    fprintf(traceOutput, "0 ");
 }         
+
+void checker:: printbody()
+{
+   for (int i=antecedents.size()-1; i>=0; i--) fprintf(traceOutput, "%i ", antecedents[i]);
+}	
 
 void checker:: printrace(int clsNo)
 {
    vec <Lit> lits;
    printracHead(clsNo, lits);
-   fprintf(traceOutput, "0 ");
-   int sz=antecedents.size()-1;
-   for (int i=sz; i>=0; i--) fprintf(traceOutput, "%i ", antecedents[i]);
+   if(clsNo>0) printbody();
    fprintf(traceOutput, "0\n");
 }         
 
@@ -3108,7 +3159,7 @@ void checker:: printrace2(int clsNo)
 {
    vec <Lit> lits;
    printracHead(clsNo, lits);
-   fprintf(traceOutput, "0 ");
+
    while(tmp_unitID.size()){
          int ID=tmp_unitID.pop_();
          if(ID==0) break;
@@ -3127,8 +3178,8 @@ void checker:: printrace2(int clsNo)
 
 void checker:: printRatBody(int clsNo)
 {
-   fprintf(traceOutput, "0 -%i",getClauseID(clsNo));
-   for (int i=antecedents.size()-1; i>=0; i--) fprintf(traceOutput, "%i ", antecedents[i]);
+    fprintf(traceOutput, "-%i ",getClauseID(clsNo));
+    printbody();
 }         
 
 void checker:: printraceEnd()
@@ -3148,8 +3199,8 @@ void checker:: traceUnit(int clsNo,int lit)
 
 void checker:: TraceOrigClause()
 {   antecedents.clear();
-    for(int i=0; i<clauses.size(); i++) printrace(-i);
-    for(int i=0; i<trail.size(); i++){//unit
+    for(int i=0; i<clauses.size(); i++)	printrace(-i);
+ 	for(int i=0; i<trail.size(); i++){//unit
           unitClauseID[var(trail[i])] = ++origIDSize;
           fprintf(traceOutput, "%i %i 0 0\n",origIDSize, toIntLit(trail[i]));
     }
