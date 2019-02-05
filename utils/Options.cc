@@ -41,7 +41,7 @@ void treeRat::setHelpPrefixStr  (const char* str){ Option::getHelpPrefixString()
 void treeRat::printUsageAndExit (int argc, char** argv, bool verbose)
 {
     const char* usage = Option::getUsageString();
-    if (usage != NULL)
+	if (usage != NULL)
         fprintf(stderr, usage, argv[0]);
 
         sort(Option::getOptionList(), Option::OptionLt());
