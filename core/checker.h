@@ -16,7 +16,13 @@
    typedef  off_t  off64_t;
 #endif
 
-namespace treeRat {
+   struct AuxUnitRely{
+        int  ID;
+        int  maxAntID;
+        AuxUnitRely(int id=0, int maxId=0) {ID=id, maxAntID=maxId;}
+    };
+
+ namespace treeRat {
 
    struct DelInfo {
         DelInfo(){}
@@ -41,6 +47,7 @@ namespace treeRat {
         bool operator!=(const WatcherL & w) const { return clsNo != w.clsNo; }
     };
 
+ 
 //=================================================================================================
 class checker {
 public:
@@ -223,7 +230,7 @@ public:
     vec<Lit> unitzeroID;
     vec<int> unitID;
   
-   void printracHead(int clsNo, vec <Lit> & lits);
+    void printracHead(int clsNo, vec <Lit> & lits);
     void printrace(int clsNo);
     void printrace2(int clsNo);
     void printRatBody(int clsNo);
@@ -243,7 +250,28 @@ public:
     void printEmptyclause2();
     bool non_empty;
     int  maxClauseID, auxClauseID;
-//
+    struct UnitID {
+        int  v;
+        int  ID;
+        UnitID(int x, int id) {v=x, ID=id;}
+    };
+    vec <UnitID> saveUnitID;
+	int unitID_idx;
+    vec <AuxUnitRely> auxUnitRely;
+	struct LRATMAP {
+        int   toID;
+        int   delbegin,delend;
+		off64_t pos;
+    };
+    vec <LRATMAP> LRAT_map;
+    vec <int> delID;
+	vec <int> LRATrow;
+	
+	void sort_LRAT();
+	void readtracefile();
+	void savetracefile(); 
+	void readLRATline(off64_t pos);
+ //
     bool  checkClauseSAT(int & cls_i);
     bool  checklearntSAT(int lrn_i);
 };

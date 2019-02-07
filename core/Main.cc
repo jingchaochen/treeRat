@@ -20,6 +20,7 @@ StringOption  trace_file ("trace mode", "trace-file", "trace output file", "NULL
 FILE*  traceOutput;
 bool   tracecheck;   // output resolution graph 
 double initial_time;
+const char * Trace_file;
 //=================================================================================================
 
 int main(int argc, char** argv)
@@ -33,6 +34,7 @@ int main(int argc, char** argv)
         if(tracecheck) {
             if(!strcmp(trace_file,"NULL")) traceOutput = stdout;
             else{
+				Trace_file=trace_file;
 #ifdef  __APPLE__
                traceOutput =  fopen(trace_file, "wb");
 #else

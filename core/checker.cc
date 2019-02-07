@@ -1,6 +1,6 @@
 /************************************************************************************
 Copyright (c) 2019, Jingchao Chen (chen-jc@dhu.edu.cn)
-Feb. 5, 2019
+Feb. 7, 2019
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -19,9 +19,10 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 **************************************************************************************************/
 
 #include <math.h>
+#include <cstdio>
 #include "mtl/Sort.h"
-#include "core/checker.h"
 #include "utils/System.h"
+#include "core/checker.h"
 
 #define ABS(x) ((x)>0 ? (x) : (-x) )
 
@@ -47,6 +48,7 @@ bool movetoFront=false;
 
 extern FILE*  traceOutput;
 extern bool   tracecheck; 
+extern const char * Trace_file;
 
 #define SwapLit(a,b) { Lit t; t=a; a=b; b=t;}
 
@@ -90,6 +92,7 @@ checker::checker() :
    shiftproof=0;
    shiftmode=false;
    seen.push(0);
+   unitID_idx=-1;
 }
 
 checker::~checker()
@@ -476,7 +479,7 @@ void checker :: readratOutput(char * rupfile)
 		exit(-1);
 	}
         int unitsz=trail.size();
- 	printf("c %d units, %d bin-ternary clauses\n",unitsz,bintrn); 
+ 	    printf("c %d units, %d bin-ternary clauses\n",unitsz,bintrn); 
 
         vec <int> ratLits, lits;
         filePos.clear();
@@ -1520,6 +1523,7 @@ void checker :: rebuildwatch(int CurNo)
  
 void checker :: removeTrailUnit(Lit uLit,int CurNo)
 {   
+     unitClauseID[var(uLit)]=0;
      int lev=decisionLevel()-1;
      if(lev>=0 && trail[trail_lim[lev]]== uLit){
 //cancel:
@@ -1622,7 +1626,6 @@ void checker :: simplifyUnit()
     newDecisionLevel();
     for(int i=0; i<cur_unit.size(); i++){
           Lit lit = cur_unit[i].lit;
-          int v=var(lit);
           if(value(lit) == l_True) continue;
           int clsNo=cur_unit[i].idx+1;
           if(value(lit) == l_False){
@@ -1630,12 +1633,9 @@ void checker :: simplifyUnit()
                  ok=false;
           }
           else {
-               int saveID=unitClauseID[v];
-               unitClauseID[v]=0;
                uncheckedEnqueue(lit);
                ok = propagateMax(1);
                if(!ok) printEmptyclause2();
-               unitClauseID[v]=saveID;
           }
           if(!ok){
                filePos.shrink(filePos.size()-clsNo);
@@ -1674,6 +1674,7 @@ void checker :: setAuxUnit(Lit lit,int t)
                  if(pre_No>0 && pre_No != No) break;
                  No++;
                  if(cur_unit[k].lit==lit){
+					  if(verifyflag[No] & VERIFIED) return;//bug 2019
                       analyze_used(confl);
                       if(tracecheck) {
                           traceUnit(No, toIntLit(lit));
@@ -1684,8 +1685,17 @@ void checker :: setAuxUnit(Lit lit,int t)
                  pre_No=No;
            } 
            if(unitClauseID[cv] == 0){
-                   analyze_used(confl);
+			       if(unitID_idx>=0){
+	                    if(unitID_idx < saveUnitID.size()){
+						    if(saveUnitID[unitID_idx].v==cv){
+							    unitClauseID[cv]= saveUnitID[unitID_idx++].ID;
+                           	}
+                        }
+                        return;
+                   }
+				   analyze_used(confl);
                    unitClauseID[cv]= ++auxClauseID;
+				   saveUnitID.push(UnitID(cv,auxClauseID));
                    if(tracecheck) {
                        traceUnit(auxClauseID-origIDSize, toIntLit(lit));
                    }
@@ -2117,7 +2127,7 @@ int checker :: backwardCheck()
 //
         ok=checkRup(i, lits);
         if(!ok) {
-            if(unproofn==0) filePos.shrink_(filePos.size()-1-i);
+//            if(unproofn==0) filePos.shrink_(filePos.size()-1-i); //note delete info need to display, clear tail Unit ID 
             unproofn++;
 			RatcheckCls.push(i);
         }
@@ -2130,23 +2140,27 @@ int checker :: backwardCheck()
              if(coreNum>70000) clearCoreflag(i);
         }
    }
+   if(tracecheck){
+	    LRAT_map.growTo(auxClauseID+1);
+        for(int j=0; j <=auxClauseID; j++) LRAT_map[j].delbegin=-1;
+   }
    if(unproofn){
          printf("\nc %d inferences are not verified in RUP check step\n",unproofn);
          auxUnit.clear();
          coreMode=0;
          clearCoreflag(0);
+		 unitID_idx=0;
          return RATCheck();
    }
-
+	
    printf("\nc %d inferences, %d units are verified\n",proofn,unitproof);
    if(shiftusedproof) 
          printf("c %d out of %d verified inferences is useful in win shift step\n",shiftusedproof,shiftproof);
    else  printf("c %d inferences are verified in win shift step\n",shiftproof);
    printf("c %d deleted inferences\n",Delqueue.size());
+   sort_LRAT();
  
    printf("c proof is verified\n");
-   fclose(rat_fp);
-   if(tracecheck) fclose(traceOutput);
    return 1;
 }
 
@@ -2227,7 +2241,7 @@ bool checker :: conflictCheck(int lrn_No, vec<Lit> & lits)
      cancelUntil(decisionLevel()-1);
      return ok;
 }
-   
+    
 int checker :: RATCheck()
 {
     cancelUntil(0);
@@ -2270,15 +2284,21 @@ int checker :: RATCheck()
         else if(No<=end) learntDel[No]=1;
         if(tracecheck){
 			int ID=getClauseID(Delqueue[i].timeNo+1);
-			if(ID != preDelID){
-                if(preDelID==-1) fprintf(traceOutput, "%i d ", ID);
-				else 	         fprintf(traceOutput, "0\n%i d ", ID);
-            }
-			fprintf(traceOutput, "%i ", getClauseID(No));
+         	if(ID != preDelID){
+               // if(preDelID==-1) fprintf(traceOutput, "%i d ", ID);
+				//else 	         fprintf(traceOutput, "0\n%i d ", ID);
+				
+		        if(preDelID != -1 ) LRAT_map[preDelID].delend = delID.size();
+    			LRAT_map[ID].delbegin = delID.size();
+	        }
+			delID.push(getClauseID(No));
+			//fprintf(traceOutput, "%i ", getClauseID(No));
 			preDelID=ID;
 		}	
     }
-    if(tracecheck && preDelID != -1) fprintf(traceOutput, "0\n");
+	
+    //if(tracecheck && preDelID != -1) fprintf(traceOutput, "0\n");
+    if(tracecheck && preDelID != -1) LRAT_map[preDelID].delend = delID.size();
 
     for(int i=end; i>=0; i--){
            if(lastDel>=0 && i<=Delqueue[lastDel].timeNo) restoreDelClause(i, 0,0);
@@ -2384,9 +2404,10 @@ nextclase:
      }
      printf("\nc %d inferences, %d units are verified\n",proofn,unitproof);
      printf("c %d units and %d inferences are verified in RAT check\n",RatUnitProof,RatProofn);
-     printf("c proof is verified \n");
      delete []RATindex;
      free(RATvar);
+	 sort_LRAT();
+     printf("c proof is verified \n");
      return 1;
 }
 
@@ -3192,8 +3213,25 @@ void checker:: traceUnit(int clsNo,int lit)
    fprintf(traceOutput, "%i %i 0 ", ID,lit);
 
    int sz=antecedents.size()-1;
-   for (int i=sz; i>=0; i--)
-           if(antecedents[i] != ID) fprintf(traceOutput, "%i ", antecedents[i]);
+   int maxID=origIDSize;
+   for (int i=sz; i>=0; i--){
+	   int AntID = antecedents[i];
+	   if( AntID != ID){
+  		    fprintf(traceOutput, "%i ", AntID);
+            if(ID>maxClauseID){
+           		if(AntID> maxClauseID){
+					for(int k=auxUnitRely.size()-1; k>=0; k--)
+                        if(auxUnitRely[k].ID == AntID) {
+           					if(maxID < auxUnitRely[k].maxAntID) maxID = auxUnitRely[k].maxAntID;
+							break;
+						}
+		        }				
+                else if(maxID < AntID) maxID = AntID;
+			}
+	   }
+   }
+   if(ID>maxClauseID) auxUnitRely.push(AuxUnitRely(ID,maxID));
+	   
    fprintf(traceOutput, "0\n");
 }         
 
@@ -3256,4 +3294,132 @@ void checker:: printEmptyclause2()
        fprintf(traceOutput, "0\n");
    }
 }
+
+struct IDrely_lt { 
+    bool operator () (struct AuxUnitRely x, struct AuxUnitRely y) const {
+		if(x.maxAntID < y.maxAntID) return 1;
+		return x.ID < y.ID; 
+	}
+};
+void checker:: sort_LRAT()
+{
+    fclose(rat_fp);
+	if( (!tracecheck) || traceOutput == stdout) return;
+	fclose(traceOutput);
+    sort(auxUnitRely, IDrely_lt());
+	
+    int m=origIDSize+1;	
+    for(int j=m; j <=auxClauseID; j++) LRAT_map[j].toID=-1;
+	int k=0;
+    for(int j=m; j <=auxClauseID; ){
+		if(LRAT_map[j].toID>0) {j++; continue;}
+		if(k>=auxUnitRely.size() || j<=auxUnitRely[k].maxAntID) {
+			LRAT_map[j++].toID=m++;
+			continue;
+		}
+        LRAT_map[auxUnitRely[k++].ID].toID=m++;
+    }
+    for(int j=0; j <=auxClauseID; j++) LRAT_map[j].pos=0;
+	readtracefile(); 
+    savetracefile();
+}
+
+void checker :: readtracefile() 
+{
+#ifdef  __APPLE__
+        traceOutput  = fopen(Trace_file, "r");
+#else
+        traceOutput  = fopen64(Trace_file, "r");
+#endif
+        int ID;
+        while(1) {
+            int ret=fscanf(traceOutput, "%i", &ID);
+            if( ret == EOF) return;
+            #ifdef  __APPLE__
+        	    LRAT_map[ID].pos = ftello(traceOutput);
+            #else 
+                LRAT_map[ID].pos = ftello64(traceOutput);
+            #endif
+            while(1){
+                char c = fgetc(traceOutput);
+                if(c == EOF) return;
+                if(c == '\n') break;
+            }
+ 	    }
+}
+
+void checker :: savetracefile() 
+{
+        int n=strlen(Trace_file);
+    	char *tmp_file = new char[n+10];
+		stpcpy(tmp_file,Trace_file);
+	    tmp_file[n]='t';
+	    tmp_file[n+1]=0;
+		
+#ifdef  __APPLE__
+        FILE* tmpOutput  = fopen(tmp_file, "w");
+#else
+        FILE* tmpOutput  = fopen64(tmp_file, "w");
+#endif
+     
+	    for(int i=origIDSize; i>=0; i--) LRAT_map[i].toID=i;
+ //    
+        vec <int> oldID(auxClauseID+2);
+        for(int i=0; i <= auxClauseID; i++) oldID[i]=i;
+        for(int i=origIDSize+1; i <= auxClauseID; i++) oldID[LRAT_map[i].toID]=i;
+        
+		int m;
+     	for(int cID=1; cID <=auxClauseID; cID++){
+			int orgID=oldID[cID];
+	        if(LRAT_map[orgID].pos <=0) goto putdel;
+            readLRATline(LRAT_map[orgID].pos);
+            if(LRATrow.size() == 0) goto putdel;
+		    fprintf(tmpOutput, "%i", cID);
+            m=0;
+  		    for(; m < LRATrow.size(); m++) {// lit
+				 fprintf(tmpOutput, " %i", LRATrow[m]);
+				 if(LRATrow[m]==0) break;
+			}
+			for(m++; m < LRATrow.size(); m++) {// ant ID
+				 int oldid = LRATrow[m];
+        		 int newID = 0;
+		         if( oldid > 0 ) newID = LRAT_map[oldid].toID;
+                 else if( oldid < 0 ) newID = -LRAT_map[-oldid].toID;
+         		 fprintf(tmpOutput, " %i", newID);
+			}
+			
+			fprintf(tmpOutput, "\n");
+putdel:     
+            if(LRAT_map[orgID].delbegin<0 || LRAT_map[orgID].delbegin>=LRAT_map[orgID].delend) continue;
+		    fprintf(tmpOutput, "%i d ", cID);
+		    for(int i=LRAT_map[orgID].delbegin; i < LRAT_map[orgID].delend; i++){
+				 fprintf(tmpOutput, "%i ", LRAT_map[delID[i]].toID);
+			}
+			fprintf(tmpOutput, "0\n");
+		}
+        fclose(tmpOutput);
+        fclose(traceOutput);
+		rename(tmp_file,Trace_file);
+}
+
+void checker :: readLRATline(off64_t pos)
+{
+     #ifdef  __APPLE__
+           fseeko(traceOutput, pos,SEEK_SET);
+     #else 
+           fseeko64(traceOutput, pos,SEEK_SET);
+     #endif
+     LRATrow.clear();
+     int cnt=0;
+     while(1){
+          int No;
+          int ret=fscanf(traceOutput, "%i", &No);
+          if(ret == EOF) break;
+          LRATrow.push(No);
+          if(No==0){
+               cnt++;
+               if(cnt==2) return;
+          }
+     }
+ }
 
