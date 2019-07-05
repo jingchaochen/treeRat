@@ -1,6 +1,6 @@
 /************************************************************************************
 Copyright (c) 2019, Jingchao Chen (chen-jc@dhu.edu.cn)
-Feb. 7, 2019
+June 5, 2019
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -470,111 +470,112 @@ void checker :: readratOutput(char * rupfile)
       lit_begin_end.clear();
 
 #ifdef  __APPLE__
-        rat_fp  = fopen(rupfile, "r");
+      rat_fp  = fopen(rupfile, "r");
 #else
-        rat_fp  = fopen64(rupfile, "r");
+      rat_fp  = fopen64(rupfile, "r");
 #endif
-        if (rat_fp == NULL) {
+     if (rat_fp == NULL) {
 		fprintf(stderr, "c Error: cannot open the drat file: %s\n", rupfile);
 		exit(-1);
-	}
-        int unitsz=trail.size();
- 	    printf("c %d units, %d bin-ternary clauses\n",unitsz,bintrn); 
+	  }
+      int unitsz=trail.size();
+ 	  printf("c %d units, %d bin-ternary clauses\n",unitsz,bintrn); 
 
-        vec <int> ratLits, lits;
-        filePos.clear();
-        verifyMark.clear();
-        off64_t curpos=0;
-        int prelit=0, RatNo=0;
-        int curlit;
-        origVars=nVars();
-        int new_b=0,pre_size=-1;
-        while(1) {
-		char c = fgetc(rat_fp);
-                if (c == 'd'){
+      vec <int> ratLits, lits;
+      filePos.clear();
+      verifyMark.clear();
+      off64_t curpos=0;
+      int prelit=0, RatNo=0;
+      int curlit;
+      origVars=nVars();
+      int new_b=0,pre_size=-1;
+      while(1) {
+	     char c = fgetc(rat_fp);
+         if (c == 'd'){
         	#ifdef  __APPLE__
         		curpos = ftello(rat_fp)+1;
-                #else 
-               	        curpos = ftello64(rat_fp)+1;
-                #endif
-        	         int m=filePos.size();
-                        if(m){ 
-                            off64_t base = filebase[(m-1)/SEG_SIZE];
-                            Delqueue.push(DelInfo(m,int(curpos-base)));
-                        }
-                       	do { c = fgetc(rat_fp);
-			} while ((c != '\n') && (c != EOF));
+            #else 
+               	curpos = ftello64(rat_fp)+1;
+            #endif
+        	    int m=filePos.size();
+                if(m){ 
+                    off64_t base = filebase[(m-1)/SEG_SIZE];
+                    Delqueue.push(DelInfo(m,int(curpos-base)));
+                }
+               	do { c = fgetc(rat_fp);
+			    } while ((c != '\n') && (c != EOF));
 		        continue;
-                 }
-		 if(c == EOF) return;
-                 if(c == '\n') continue;
-                 #ifdef  __APPLE__
-        	     fseeko(rat_fp, (off64_t)-1, SEEK_CUR);
-                     curpos = ftello(rat_fp);
-                #else 
-                     fseeko64(rat_fp, (off64_t)-1, SEEK_CUR);
-                     curpos = ftello64(rat_fp);
-               	#endif
-        	 lits.clear();
-                 int newV=0; 
-                 while(1){
-                        int ilit;
-                	int ret=fscanf(rat_fp, "%i", &ilit);
-              		if(ret == EOF) goto done;
-                        if(ilit==0) break;
-                        lits.push(ilit);
-		        int v = ABS(ilit);
-                        if(v <= nVars()) continue;
-                        newV=ilit;
-                        while (v > nVars()) newVar();
-          	 }
-                 if(lits.size()==0) goto done;
-                 Lit firstL=makeLit(lits[0]);
-                 int curIdx=filePos.size();
-                 if(lits.size()==1) {
-                       cur_unit.push(UnitIndex(curIdx,firstL));
-                       if(unitClauseID[var(firstL)]==0) unitClauseID[var(firstL)]=curIdx+origIDSize+1;
-                 }
-                 int m=filePos.size();
+		 }
+		 if(c == EOF) goto done;
+         if(c == '\n' || c == ' ') continue;
+         if(c != '-' && (c <'0' || c>'9') && c != '+') continue;
+         #ifdef  __APPLE__
+        	fseeko(rat_fp, (off64_t)-1, SEEK_CUR);
+            curpos = ftello(rat_fp);
+         #else 
+            fseeko64(rat_fp, (off64_t)-1, SEEK_CUR);
+            curpos = ftello64(rat_fp);
+         #endif
+         lits.clear();
+         int newV=0; 
+         while(1){
+            int ilit;
+            int ret=fscanf(rat_fp, "%i", &ilit);
+            if(ret == EOF) goto done;
+            if(ilit==0) break;
+            lits.push(ilit);
+		    int v = ABS(ilit);
+                if(v <= nVars()) continue;
+                newV=ilit;
+                while (v > nVars()) newVar();
+          	}
+            if(lits.size()==0) goto done;
+            Lit firstL=makeLit(lits[0]);
+            int curIdx=filePos.size();
+            if(lits.size()==1) {
+                cur_unit.push(UnitIndex(curIdx,firstL));
+                if(unitClauseID[var(firstL)]==0) unitClauseID[var(firstL)]=curIdx+origIDSize+1;
+            }
+            int m=filePos.size();
                
-                 if (verbosity) if(m%500000==0) printf(" f.s=%d \n",m);
+            if (verbosity) if(m%500000==0) printf(" f.s=%d \n",m);
 
-                 if( m%SEG_SIZE == 0) filebase.push(curpos);
-                 off64_t base = filebase[m/SEG_SIZE];
-                 filePos.push(int(curpos-base));
-                 curlit=toInt(firstL);
-                 if(prelit != curlit){
-                       int cur_sz = curIdx-new_b;
-                       if(maxdisFirstvar < cur_sz ) maxdisFirstvar = cur_sz;
-                       if(cur_sz>100){
-                           lit_begin_end.push(prelit);
-                           lit_begin_end.push(new_b);
-                           if(pre_size==1) lit_begin_end.push(curIdx-1);          
-                           else lit_begin_end.push(curIdx);         
-                       }
-                       prelit=curlit;
-                       new_b=curIdx;
-                 }
-                 pre_size=lits.size();
-                 if(newV){
-                        verifyMark.push(VERIFIED);
-                        RatNo=verifyMark.size();
-                        if(tracecheck) printEqRat1(RatNo, lits);
-                        lits.copyTo(ratLits);
-                        continue;
-                 }
-                 if(lits.size()>1){
-                      if(ratLits.size() && ratLits[0] == -lits[0]){
-                            for(int k=1; k<ratLits.size(); k++){
-                                 if(ratLits[k] != -lits[1]) continue;
-                                 verifyMark.push(VERIFIED);
-                                 if(tracecheck) printEqRat2(verifyMark.size(), RatNo,lits);
-                                 goto next;
-                             }
-                       }
-                 }
-                 verifyMark.push(0);
-                 ratLits.clear();
+            if( m%SEG_SIZE == 0) filebase.push(curpos);
+            off64_t base = filebase[m/SEG_SIZE];
+            filePos.push(int(curpos-base));
+            curlit=toInt(firstL);
+            if(prelit != curlit){
+                int cur_sz = curIdx-new_b;
+                if(maxdisFirstvar < cur_sz ) maxdisFirstvar = cur_sz;
+                if(cur_sz>100){
+                    lit_begin_end.push(prelit);
+                    lit_begin_end.push(new_b);
+                    if(pre_size==1) lit_begin_end.push(curIdx-1);          
+                    else lit_begin_end.push(curIdx);         
+                }
+                prelit=curlit;
+                new_b=curIdx;
+            }
+            pre_size=lits.size();
+            if(newV){
+                verifyMark.push(VERIFIED);
+                RatNo=verifyMark.size();
+                if(tracecheck) printEqRat1(RatNo, lits);
+                lits.copyTo(ratLits);
+                continue;
+            }
+            if(lits.size()>1){
+                if(ratLits.size() && ratLits[0] == -lits[0]){
+                    for(int k=1; k<ratLits.size(); k++){
+                       if(ratLits[k] != -lits[1]) continue;
+                       verifyMark.push(VERIFIED);
+                       if(tracecheck) printEqRat2(verifyMark.size(), RatNo,lits);
+                       goto next;
+                    }
+                }
+            }
+            verifyMark.push(0);
+            ratLits.clear();
 next:            ;
                  
 	}
