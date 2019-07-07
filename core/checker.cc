@@ -1,6 +1,6 @@
 /************************************************************************************
 Copyright (c) 2019, Jingchao Chen (chen-jc@dhu.edu.cn)
-June 5, 2019
+July 7, 2019
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -488,20 +488,22 @@ void checker :: readratOutput(char * rupfile)
       int prelit=0, RatNo=0;
       int curlit;
       origVars=nVars();
-      int new_b=0,pre_size=-1;
+      int m,new_b=0,pre_size=-1;
       while(1) {
 	     char c = fgetc(rat_fp);
+         if(c == 'c' || c == 'o') goto endline;
          if (c == 'd'){
         	#ifdef  __APPLE__
         		curpos = ftello(rat_fp)+1;
             #else 
                	curpos = ftello64(rat_fp)+1;
             #endif
-        	    int m=filePos.size();
+        	    m=filePos.size();
                 if(m){ 
                     off64_t base = filebase[(m-1)/SEG_SIZE];
                     Delqueue.push(DelInfo(m,int(curpos-base)));
                 }
+endline:				
                	do { c = fgetc(rat_fp);
 			    } while ((c != '\n') && (c != EOF));
 		        continue;
